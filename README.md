@@ -1,0 +1,213 @@
+# IRIS
+
+IRIS is a Rust CLI for turning an infrared-controlled TV into a command-driven TV through a Raspberry Pi 3. It loads editable TOML remote profiles and sends IR commands through a GPIO-connected infrared LED.
+
+The first supported profile is Telstar, but profiles are data files under `profiles/tv/<brand>/<model>.toml`; the Rust source does not hardcode remote codes.
+
+## Hardware
+
+Recommended parts:
+
+- Raspberry Pi 3 with Raspberry Pi OS.
+- 940 nm infrared emitter LED.
+- Breadboard and jumper wires.
+- NPN transistor such as 2N2222 or PN2222.
+- Base resistor around 1 kOhm.
+- IR LED current-limiting resistor sized for your LED and supply voltage.
+- Optional future receiver module, usually 38 kHz, for learning mode.
+
+Basic transistor wiring:
+
+```text
+Raspberry Pi GPIO 18 --- 1 kOhm --- NPN base
+Raspberry Pi GND ------------------- NPN emitter
+5V or 3.3V --- resistor --- IR LED anode
+IR LED cathode --------------------- NPN collector
+```
+
+Check your LED current rating and resistor values before powering the circuit.
+
+## Install
+
+Install Rust on the Pi, clone or copy this project, then build with the GPIO backend:
+
+```bash
+cargo build --release --features rpi-gpio
+sudo install -m 0755 target/release/iris /usr/local/bin/iris
+```
+
+For development on a non-Pi machine, build without GPIO and use dry-run:
+
+```bash
+cargo build
+iris send power --dry-run
+```
+
+## Configuration
+
+IRIS reads user config from:
+
+```text
+~/.config/iris/config.toml
+```
+
+Default values:
+
+```toml
+gpio_pin = 18
+carrier_frequency = 38000
+active_profile = "telstar/generic"
+default_repeat = 1
+log_level = "info"
+server_host = "127.0.0.1"
+server_port = 8787
+api_token = ""
+```
+
+Set values from the CLI:
+
+```bash
+iris config set gpio_pin 18
+iris config set carrier_frequency 38000
+iris config set default_repeat 1
+```
+
+Enable debug logs with:
+
+```bash
+RUST_LOG=debug iris send power
+```
+
+## Basic Use
+
+Load a profile:
+
+```bash
+iris start "telstar xxx"
+```
+
+Send commands using the active profile:
+
+```bash
+iris send power
+iris send volume_up
+iris send volume_down
+iris send mute
+```
+
+Repeat a command:
+
+```bash
+iris send volume_up --repeat 3
+```
+
+Preview without touching GPIO:
+
+```bash
+iris send power --dry-run
+```
+
+List and inspect profiles:
+
+```bash
+iris list brands
+iris list models telstar
+iris profile show "telstar xxx"
+iris status
+```
+
+## Profiles
+
+Profiles live under:
+
+```text
+profiles/tv/<brand>/<model>.toml
+```
+
+Example:
+
+```toml
+brand = "telstar"
+model = "xxx"
+device_type = "tv"
+carrier_frequency = 38000
+protocol = "nec"
+
+[commands]
+power = { type = "nec", address = "0x00FF", command = "0xA25D" }
+volume_up = { type = "nec", address = "0x00FF", command = "0x629D" }
+raw_demo = { type = "raw", frequency = 38000, pulses = [9000, 4500, 560, 560] }
+```
+
+To add a new TV, create a new TOML file such as:
+
+```text
+profiles/tv/samsung/living_room.toml
+```
+
+Then load it:
+
+```bash
+iris start "samsung living_room"
+```
+
+The included Telstar codes are templates. Telstar remotes may vary by model, so replace the values after capturing the real remote codes.
+
+## Local Server
+
+Run a foreground local API server:
+
+```bash
+iris serve "telstar xxx"
+```
+
+Run it in the background:
+
+```bash
+iris daemon start "telstar xxx"
+iris daemon stop
+```
+
+Default bind address:
+
+```text
+127.0.0.1:8787
+```
+
+Endpoints:
+
+```text
+GET  /health
+GET  /profile
+POST /send/power
+POST /send/volume_up
+POST /send/volume_down
+POST /send/mute
+POST /send/input
+POST /send/{command}
+```
+
+The server listens only on localhost by default. If you change `server_host` to a LAN address such as `0.0.0.0`, configure an API token first:
+
+```bash
+iris config set api_token "replace-with-a-long-random-value"
+```
+
+Then call protected endpoints with:
+
+```bash
+curl -X POST \
+  -H "Authorization: Bearer replace-with-a-long-random-value" \
+  http://127.0.0.1:8787/send/power
+```
+
+## Development
+
+Run checks:
+
+```bash
+cargo fmt --check
+cargo clippy --all-targets --no-default-features -- -D warnings
+cargo test --no-default-features
+cargo check --features rpi-gpio
+```

@@ -1,0 +1,22 @@
+brand = "telstar"
+model = "generic"
+device_type = "tv"
+carrier_frequency = 38000
+protocol = "nec"
+
+[commands]
+power = { type = "nec", address = "0x00FF", command = "0xA25D" }
+volume_up = { type = "nec", address = "0x00FF", command = "0x629D" }
+volume_down = { type = "nec", address = "0x00FF", command = "0xA857" }
+mute = { type = "nec", address = "0x00FF", command = "0xE21D" }
+input = { type = "nec", address = "0x00FF", command = "0x22DD" }
+channel_up = { type = "nec", address = "0x00FF", command = "0x02FD" }
+channel_down = { type = "nec", address = "0x00FF", command = "0xC23D" }
+menu = { type = "nec", address = "0x00FF", command = "0xE01F" }
+up = { type = "nec", address = "0x00FF", command = "0x9867" }
+down = { type = "nec", address = "0x00FF", command = "0x38C7" }
+left = { type = "nec", address = "0x00FF", command = "0x30CF" }
+right = { type = "nec", address = "0x00FF", command = "0x7A85" }
+ok = { type = "nec", address = "0x00FF", command = "0x18E7" }
+back = { type = "nec", address = "0x00FF", command = "0x4AB5" }
+home = { type = "nec", address = "0x00FF", command = "0x10EF" }
