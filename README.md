@@ -42,7 +42,7 @@ curl -fsSL https://raw.githubusercontent.com/pieza/iris-tv/main/scripts/install.
 Install a specific version:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/pieza/iris-tv/main/scripts/install.sh | bash -s -- V1.5.0
+curl -fsSL https://raw.githubusercontent.com/pieza/iris-tv/main/scripts/install.sh | bash -s -- V1.5.1
 ```
 
 The installer downloads the release asset, installs `iris` to `/usr/local/bin/iris`, and installs editable profiles to `/usr/local/share/iris/profiles`.
@@ -141,6 +141,18 @@ IRIS sends one candidate at a time and waits for Enter before the next one. If a
 
 ```bash
 iris scan power --repeat 5
+```
+
+Run a broad scan that sends different candidate commands once per second:
+
+```bash
+iris scan bomb
+```
+
+Stop it with `Ctrl+C` when the TV reacts, then note the last candidate printed. Use `--limit`, `--repeat`, and `--interval-ms` to tune the scan:
+
+```bash
+iris scan bomb --repeat 3 --interval-ms 1000
 ```
 
 Repeat a command:
