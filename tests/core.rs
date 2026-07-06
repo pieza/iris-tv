@@ -1,4 +1,5 @@
 use iris::config::{AppConfig, ConfigStore, resolve_profile_root};
+use iris::discovery;
 use iris::errors::IrisError;
 use iris::ir::{DryRunTransmitter, IrSignal, IrTransmitter, MockTransmitter, build_nec_pulses};
 use iris::profiles::{Profile, ProfileId, ProfileStore};
@@ -99,6 +100,71 @@ fn config_store_persists_active_profile() {
 
     assert_eq!(loaded.active_profile.as_deref(), Some("telstar/generic"));
     assert_eq!(loaded.gpio_pin, 23);
+}
+
+#[test]
+fn config_store_generates_and_persists_device_id_once() {
+    let root = tempdir().expect("temp root");
+    let store = ConfigStore::new(root.path());
+
+    let first = store.ensure_device_id().expect("first id");
+    let second = store.ensure_device_id().expect("second id");
+    let loaded = store.load().expect("load config");
+
+    assert!(!first.is_empty());
+    assert_eq!(first, second);
+    assert_eq!(loaded.device_id.as_deref(), Some(first.as_str()));
+}
+
+#[test]
+fn home_assistant_setup_prepares_network_config_and_token() {
+    let root = tempdir().expect("temp root");
+    let store = ConfigStore::new(root.path());
+
+    let prepared = store.prepare_home_assistant().expect("setup config");
+    let loaded = store.load().expect("load config");
+
+    assert_eq!(prepared.server_host, "0.0.0.0");
+    assert_eq!(prepared.server_port, 8787);
+    assert!(prepared.discovery_enabled);
+    assert!(
+        prepared
+            .device_id
+            .as_deref()
+            .is_some_and(|id| !id.is_empty())
+    );
+    assert!(
+        prepared
+            .api_token
+            .as_deref()
+            .is_some_and(|token| token.len() >= 32)
+    );
+    assert_eq!(loaded, prepared);
+}
+
+#[test]
+fn mdns_service_info_contains_home_assistant_discovery_metadata() {
+    let profile = Profile::from_toml_str(TELSTAR_PROFILE).expect("profile parses");
+    let config = AppConfig {
+        device_id: Some("iris-test-device".to_string()),
+        device_name: "Living Room IRIS".to_string(),
+        api_token: Some("secret".to_string()),
+        ..AppConfig::default()
+    };
+
+    let service = discovery::build_service_info(&profile, &config).expect("service info");
+
+    assert_eq!(service.get_type(), "_iris-tv._tcp.local.");
+    assert_eq!(service.get_port(), config.server_port);
+    assert_eq!(service.get_property_val_str("id"), Some("iris-test-device"));
+    assert_eq!(
+        service.get_property_val_str("name"),
+        Some("Living Room IRIS")
+    );
+    assert_eq!(service.get_property_val_str("brand"), Some("telstar"));
+    assert_eq!(service.get_property_val_str("model"), Some("generic"));
+    assert_eq!(service.get_property_val_str("api_version"), Some("1"));
+    assert_eq!(service.get_property_val_str("auth_required"), Some("true"));
 }
 
 #[test]

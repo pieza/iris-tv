@@ -72,6 +72,9 @@ pub enum IrisError {
 
     #[error("server exposure requires api_token when server_host is not loopback")]
     MissingApiTokenForNetworkBind,
+
+    #[error("failed to advertise mDNS service: {0}")]
+    Discovery(String),
 }
 
 impl IrisError {

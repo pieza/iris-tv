@@ -63,3 +63,26 @@ fn start_accepts_optional_model() {
         .success()
         .stdout(contains("Loaded active profile telstar/ttc04"));
 }
+
+#[test]
+fn home_assistant_setup_command_persists_network_discovery_config() {
+    let config_dir = tempdir().expect("config dir");
+
+    Command::cargo_bin("iris")
+        .expect("binary")
+        .env("IRIS_CONFIG_DIR", config_dir.path())
+        .args(["home-assistant", "setup"])
+        .assert()
+        .success()
+        .stdout(contains("Home Assistant discovery is ready"))
+        .stdout(contains("server = 0.0.0.0:8787"))
+        .stdout(contains("api_token ="));
+
+    let config = std::fs::read_to_string(config_dir.path().join("config.toml"))
+        .expect("config file written");
+    assert!(config.contains("server_host = \"0.0.0.0\""));
+    assert!(config.contains("server_port = 8787"));
+    assert!(config.contains("discovery_enabled = true"));
+    assert!(config.contains("device_id = "));
+    assert!(config.contains("api_token = "));
+}

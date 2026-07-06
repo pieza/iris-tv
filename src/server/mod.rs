@@ -1,4 +1,5 @@
 use crate::config::AppConfig;
+use crate::discovery;
 use crate::errors::IrisError;
 use crate::ir::{IrTransmitter, MockTransmitter};
 use crate::profiles::Profile;
@@ -54,6 +55,7 @@ pub async fn serve(
             source,
         })?;
     tracing::info!("IRIS server listening on {addr}");
+    let _discovery = discovery::register(&profile, &config)?;
     axum::serve(listener, build_router(profile, config, transmitter)).await?;
     Ok(())
 }
@@ -71,8 +73,18 @@ fn ensure_bind_is_safe(config: &AppConfig) -> Result<(), IrisError> {
     Ok(())
 }
 
-async fn health() -> impl IntoResponse {
-    Json(json!({ "status": "ok" }))
+async fn health(State(state): State<ServerState>) -> impl IntoResponse {
+    Json(json!({
+        "status": "ok",
+        "api_version": 1,
+        "device_id": state.config.device_id.as_deref().unwrap_or(""),
+        "device_name": state.config.device_name,
+        "auth_required": state
+            .config
+            .api_token
+            .as_deref()
+            .is_some_and(|token| !token.is_empty())
+    }))
 }
 
 async fn profile_handler(
@@ -88,6 +100,7 @@ async fn profile_handler(
         Json(json!({
             "brand": state.profile.brand,
             "model": state.profile.model,
+            "id": state.profile.id(),
             "device_type": state.profile.device_type,
             "commands": state.profile.commands.keys().collect::<Vec<_>>()
         })),

@@ -82,6 +82,9 @@ log_level = "info"
 server_host = "127.0.0.1"
 server_port = 8787
 api_token = ""
+device_id = ""
+device_name = "IRIS TV"
+discovery_enabled = true
 ```
 
 Set values from the CLI:
@@ -90,6 +93,7 @@ Set values from the CLI:
 iris config set gpio_pin 18
 iris config set carrier_frequency 38000
 iris config set default_repeat 1
+iris config set device_name "Living Room IRIS"
 ```
 
 Enable debug logs with:
@@ -226,6 +230,28 @@ curl -X POST \
   -H "Authorization: Bearer replace-with-a-long-random-value" \
   http://127.0.0.1:8787/send/power
 ```
+
+## Home Assistant
+
+IRIS can be discovered by Home Assistant over Zeroconf/mDNS as a local TV bridge. Home Assistant can only show IRIS as a discovered device after the IRIS custom integration has been installed once.
+
+The Home Assistant integration lives in its own repository:
+
+```text
+https://github.com/pieza/iris-home-assistant
+```
+
+Recommended IRIS setup on the Raspberry Pi:
+
+```bash
+iris start telstar
+iris home-assistant setup
+iris daemon start telstar
+```
+
+`iris home-assistant setup` generates and persists a `device_id`, generates an `api_token` if one is missing, enables discovery, and configures the server to listen on `0.0.0.0:8787`. Protected endpoints still require the token.
+
+Install `iris-home-assistant` through HACS as a custom repository of type `Integration`. After Home Assistant restarts, accept the discovered IRIS device and enter the API token printed by `iris home-assistant setup`.
 
 ## Development
 

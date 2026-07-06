@@ -38,6 +38,10 @@ pub enum Commands {
         #[command(subcommand)]
         command: DaemonCommands,
     },
+    HomeAssistant {
+        #[command(subcommand)]
+        command: HomeAssistantCommands,
+    },
     Serve(DeviceArgs),
     Status,
 }
@@ -80,6 +84,11 @@ pub enum DaemonCommands {
     Stop,
 }
 
+#[derive(Debug, Subcommand)]
+pub enum HomeAssistantCommands {
+    Setup,
+}
+
 pub async fn run(cli: Cli) -> Result<(), IrisError> {
     let config_store = ConfigStore::from_environment()?;
     let profile_store = ProfileStore::new(default_profile_root());
@@ -91,6 +100,7 @@ pub async fn run(cli: Cli) -> Result<(), IrisError> {
         Commands::Profile { command } => profile_command(&profile_store, command),
         Commands::Config { command } => config_command(&config_store, command),
         Commands::Daemon { command } => daemon_command(&config_store, &profile_store, command),
+        Commands::HomeAssistant { command } => home_assistant_command(&config_store, command),
         Commands::Serve(args) => serve(&config_store, &profile_store, &args).await,
         Commands::Status => status(&config_store),
     }
@@ -178,6 +188,26 @@ fn config_command(config_store: &ConfigStore, command: ConfigCommands) -> Result
     Ok(())
 }
 
+fn home_assistant_command(
+    config_store: &ConfigStore,
+    command: HomeAssistantCommands,
+) -> Result<(), IrisError> {
+    match command {
+        HomeAssistantCommands::Setup => {
+            let config = config_store.prepare_home_assistant()?;
+            println!("Home Assistant discovery is ready");
+            println!("device_id = {}", config.device_id.as_deref().unwrap_or(""));
+            println!("device_name = {}", config.device_name);
+            println!("server = {}:{}", config.server_host, config.server_port);
+            println!("api_token = {}", config.api_token.as_deref().unwrap_or(""));
+            println!(
+                "Install the IRIS custom integration in Home Assistant, then accept the discovered device."
+            );
+        }
+    }
+    Ok(())
+}
+
 fn daemon_command(
     config_store: &ConfigStore,
     profile_store: &ProfileStore,
@@ -206,13 +236,24 @@ async fn serve(
     profile_store: &ProfileStore,
     args: &DeviceArgs,
 ) -> Result<(), IrisError> {
-    let loaded = profile_store.load_brand_model(&args.brand, args.model.as_deref())?;
+    let loaded = load_device_or_profile(profile_store, args)?;
     let mut config = config_store.load()?;
     config.active_profile = Some(loaded.id());
     config_store.save(&config)?;
     let frequency = effective_frequency(&config, &loaded);
     let transmitter = Arc::new(RppalTransmitter::new(config.gpio_pin, frequency)?);
     server::serve(loaded, config, transmitter).await
+}
+
+fn load_device_or_profile(
+    profile_store: &ProfileStore,
+    args: &DeviceArgs,
+) -> Result<crate::profiles::Profile, IrisError> {
+    if args.model.is_none() && args.brand.contains('/') {
+        profile_store.load(&args.brand)
+    } else {
+        profile_store.load_brand_model(&args.brand, args.model.as_deref())
+    }
 }
 
 fn status(config_store: &ConfigStore) -> Result<(), IrisError> {
@@ -224,6 +265,12 @@ fn status(config_store: &ConfigStore) -> Result<(), IrisError> {
     println!("gpio_pin = {}", config.gpio_pin);
     println!("carrier_frequency = {}", config.carrier_frequency);
     println!("server = {}:{}", config.server_host, config.server_port);
+    println!(
+        "device_id = {}",
+        config.device_id.as_deref().unwrap_or("<none>")
+    );
+    println!("device_name = {}", config.device_name);
+    println!("discovery_enabled = {}", config.discovery_enabled);
     Ok(())
 }
 
