@@ -1,5 +1,9 @@
 # IRIS
 
+[![Release](https://img.shields.io/github/v/release/pieza/iris-tv?label=release)](https://github.com/pieza/iris-tv/releases)
+[![Build](https://github.com/pieza/iris-tv/actions/workflows/build.yml/badge.svg)](https://github.com/pieza/iris-tv/actions/workflows/build.yml)
+[![Test](https://github.com/pieza/iris-tv/actions/workflows/test.yml/badge.svg)](https://github.com/pieza/iris-tv/actions/workflows/test.yml)
+
 IRIS is a Rust CLI for turning an infrared-controlled TV into a command-driven TV through a Raspberry Pi 3. It loads editable TOML remote profiles and sends IR commands through a GPIO-connected infrared LED.
 
 The first supported profile is Telstar, but profiles are data files under `profiles/tv/<brand>/<model>.toml`; the Rust source does not hardcode remote codes.
