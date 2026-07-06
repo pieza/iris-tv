@@ -31,7 +31,23 @@ IR LED cathode --------------------- NPN collector
 
 Check your LED current rating and resistor values before powering the circuit.
 
-## Install
+## Install On Raspberry Pi
+
+Install the latest Raspberry Pi ARM64 release package directly from GitHub:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/pieza/iris-tv/main/scripts/install.sh | bash
+```
+
+Install a specific version:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/pieza/iris-tv/main/scripts/install.sh | bash -s -- V1.0.0
+```
+
+The installer downloads the release asset, installs `iris` to `/usr/local/bin/iris`, and installs editable profiles to `/usr/local/share/iris/profiles`.
+
+## Local Build
 
 Install Rust on the Pi, clone or copy this project, then build with the GPIO backend:
 

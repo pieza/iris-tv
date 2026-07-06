@@ -1,4 +1,4 @@
-use iris::config::{AppConfig, ConfigStore};
+use iris::config::{AppConfig, ConfigStore, resolve_profile_root};
 use iris::errors::IrisError;
 use iris::ir::{DryRunTransmitter, IrSignal, IrTransmitter, MockTransmitter, build_nec_pulses};
 use iris::profiles::{Profile, ProfileId, ProfileStore};
@@ -84,6 +84,21 @@ fn config_store_persists_active_profile() {
 
     assert_eq!(loaded.active_profile.as_deref(), Some("telstar/xxx"));
     assert_eq!(loaded.gpio_pin, 23);
+}
+
+#[test]
+fn profile_root_prefers_local_profiles_then_installed_profiles() {
+    let root = tempdir().expect("temp root");
+    let installed = root.path().join("installed").join("profiles");
+
+    assert_eq!(resolve_profile_root(root.path(), &installed), installed);
+
+    std::fs::create_dir_all(root.path().join("profiles")).expect("local profiles dir");
+
+    assert_eq!(
+        resolve_profile_root(root.path(), &installed),
+        root.path().join("profiles")
+    );
 }
 
 #[test]

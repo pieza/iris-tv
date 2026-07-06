@@ -126,9 +126,20 @@ pub fn default_profile_root() -> PathBuf {
     if let Ok(path) = std::env::var("IRIS_PROFILE_DIR") {
         return PathBuf::from(path);
     }
-    std::env::current_dir()
-        .unwrap_or_else(|_| PathBuf::from("."))
-        .join("profiles")
+
+    resolve_profile_root(
+        &std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
+        Path::new("/usr/local/share/iris/profiles"),
+    )
+}
+
+pub fn resolve_profile_root(current_dir: &Path, installed_profiles: &Path) -> PathBuf {
+    let local_profiles = current_dir.join("profiles");
+    if local_profiles.exists() {
+        local_profiles
+    } else {
+        installed_profiles.to_path_buf()
+    }
 }
 
 pub fn default_state_dir() -> Result<PathBuf, IrisError> {
