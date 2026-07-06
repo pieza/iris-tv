@@ -42,7 +42,7 @@ curl -fsSL https://raw.githubusercontent.com/pieza/iris-tv/main/scripts/install.
 Install a specific version:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/pieza/iris-tv/main/scripts/install.sh | bash -s -- V1.2.0
+curl -fsSL https://raw.githubusercontent.com/pieza/iris-tv/main/scripts/install.sh | bash -s -- V1.3.0
 ```
 
 The installer downloads the release asset, installs `iris` to `/usr/local/bin/iris`, and installs editable profiles to `/usr/local/share/iris/profiles`.
@@ -114,6 +114,12 @@ Load a model-specific profile when you have captured codes for that model:
 
 ```bash
 iris start telstar --model TTC04
+```
+
+For the Telstar TTS040490KK / TCL L40S4900I Linux Smart TV, use:
+
+```bash
+iris start telstar --model TTS040490KK
 ```
 
 Send commands using the active profile:

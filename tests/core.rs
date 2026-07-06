@@ -1,7 +1,10 @@
 use iris::config::{AppConfig, ConfigStore, resolve_profile_root};
 use iris::discovery;
 use iris::errors::IrisError;
-use iris::ir::{DryRunTransmitter, IrSignal, IrTransmitter, MockTransmitter, build_nec_pulses};
+use iris::ir::{
+    DryRunTransmitter, IrSignal, IrTransmitter, MockTransmitter, build_nec_pulses,
+    build_nikai_pulses,
+};
 use iris::profiles::{Profile, ProfileId, ProfileStore};
 use tempfile::tempdir;
 
@@ -15,6 +18,7 @@ protocol = "nec"
 [commands]
 power = { type = "nec", address = "0x00FF", command = "0xA25D" }
 raw_demo = { type = "raw", frequency = 38000, pulses = [9000, 4500, 560] }
+home = { type = "nikai", data = "0x0F7F08" }
 "#;
 
 #[test]
@@ -23,7 +27,7 @@ fn parses_nec_and_raw_profile_commands() {
 
     assert_eq!(profile.brand, "telstar");
     assert_eq!(profile.model, "generic");
-    assert_eq!(profile.commands.len(), 2);
+    assert_eq!(profile.commands.len(), 3);
     assert_eq!(
         profile.signal_for("power").expect("power signal"),
         IrSignal::Nec {
@@ -36,6 +40,13 @@ fn parses_nec_and_raw_profile_commands() {
         IrSignal::Raw {
             frequency: 38_000,
             pulses: vec![9000, 4500, 560]
+        }
+    );
+    assert_eq!(
+        profile.signal_for("home").expect("home signal"),
+        IrSignal::Nikai {
+            data: 0x0F7F08,
+            bits: 24
         }
     );
 }
@@ -191,6 +202,17 @@ fn nec_signal_builder_uses_expected_header_and_bit_timings() {
     assert_eq!(&pulses[4..6], &[560, 560]);
     assert_eq!(pulses.last(), Some(&560));
     assert_eq!(pulses.len(), 67);
+}
+
+#[test]
+fn nikai_signal_builder_uses_expected_header_and_msb_bit_timings() {
+    let pulses = build_nikai_pulses(0b101, 3);
+
+    assert_eq!(&pulses[0..2], &[4000, 4000]);
+    assert_eq!(&pulses[2..4], &[500, 1000]);
+    assert_eq!(&pulses[4..6], &[500, 2000]);
+    assert_eq!(&pulses[6..8], &[500, 1000]);
+    assert_eq!(&pulses[8..10], &[500, 8500]);
 }
 
 #[test]

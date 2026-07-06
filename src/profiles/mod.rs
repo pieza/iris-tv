@@ -75,6 +75,7 @@ pub struct Profile {
 #[serde(tag = "type", rename_all = "lowercase")]
 pub enum CommandDefinition {
     Nec { address: String, command: String },
+    Nikai { data: String, bits: Option<u8> },
     Raw { frequency: u32, pulses: Vec<u32> },
 }
 
@@ -106,12 +107,27 @@ impl CommandDefinition {
                 address: parse_hex_u16(address)?,
                 command: parse_hex_u16(command)?,
             }),
+            CommandDefinition::Nikai { data, bits } => Ok(IrSignal::Nikai {
+                data: parse_hex_u32(data)?,
+                bits: bits.unwrap_or(24),
+            }),
             CommandDefinition::Raw { frequency, pulses } => Ok(IrSignal::Raw {
                 frequency: *frequency,
                 pulses: pulses.clone(),
             }),
         }
     }
+}
+
+fn parse_hex_u32(value: &str) -> Result<u32, IrisError> {
+    let trimmed = value
+        .trim()
+        .strip_prefix("0x")
+        .or_else(|| value.trim().strip_prefix("0X"))
+        .unwrap_or(value.trim());
+    u32::from_str_radix(trimmed, 16).map_err(|_| IrisError::InvalidHex {
+        value: value.to_string(),
+    })
 }
 
 fn parse_hex_u16(value: &str) -> Result<u16, IrisError> {

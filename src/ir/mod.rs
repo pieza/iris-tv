@@ -9,6 +9,7 @@ use std::time::Duration;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum IrSignal {
     Nec { address: u16, command: u16 },
+    Nikai { data: u32, bits: u8 },
     Raw { frequency: u32, pulses: Vec<u32> },
 }
 
@@ -85,6 +86,9 @@ pub fn describe_signal(signal: &IrSignal, repeat: u32) -> String {
         IrSignal::Nec { address, command } => {
             format!("Dry run: NEC address=0x{address:04X} command=0x{command:04X} repeat={repeat}")
         }
+        IrSignal::Nikai { data, bits } => {
+            format!("Dry run: NIKAI data=0x{data:06X} bits={bits} repeat={repeat}")
+        }
         IrSignal::Raw { frequency, pulses } => {
             let mut preview = String::new();
             for (idx, pulse) in pulses.iter().take(8).enumerate() {
@@ -99,6 +103,24 @@ pub fn describe_signal(signal: &IrSignal, repeat: u32) -> String {
             )
         }
     }
+}
+
+pub fn build_nikai_pulses(data: u32, bits: u8) -> Vec<u32> {
+    let bit_count = bits.clamp(1, 32);
+    let mut pulses = Vec::with_capacity(usize::from(bit_count) * 2 + 4);
+    pulses.push(4000);
+    pulses.push(4000);
+    for bit in (0..bit_count).rev() {
+        pulses.push(500);
+        if (data >> bit) & 1 == 1 {
+            pulses.push(1000);
+        } else {
+            pulses.push(2000);
+        }
+    }
+    pulses.push(500);
+    pulses.push(8500);
+    pulses
 }
 
 pub fn build_nec_pulses(address: u16, command: u16) -> Vec<u32> {
@@ -164,6 +186,7 @@ impl IrTransmitter for RppalTransmitter {
                 .into_output_low();
             let pulses = match signal {
                 IrSignal::Nec { address, command } => build_nec_pulses(address, command),
+                IrSignal::Nikai { data, bits } => build_nikai_pulses(data, bits),
                 IrSignal::Raw { pulses, .. } => pulses,
             };
             for idx in 0..repeat.max(1) {
