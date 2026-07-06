@@ -6,7 +6,7 @@ use tempfile::tempdir;
 
 const TELSTAR_PROFILE: &str = r#"
 brand = "telstar"
-model = "xxx"
+model = "generic"
 device_type = "tv"
 carrier_frequency = 38000
 protocol = "nec"
@@ -21,7 +21,7 @@ fn parses_nec_and_raw_profile_commands() {
     let profile = Profile::from_toml_str(TELSTAR_PROFILE).expect("profile parses");
 
     assert_eq!(profile.brand, "telstar");
-    assert_eq!(profile.model, "xxx");
+    assert_eq!(profile.model, "generic");
     assert_eq!(profile.commands.len(), 2);
     assert_eq!(
         profile.signal_for("power").expect("power signal"),
@@ -41,14 +41,26 @@ fn parses_nec_and_raw_profile_commands() {
 
 #[test]
 fn resolves_brand_model_to_profile_id_and_file_path() {
-    let id = ProfileId::parse("Telstar XXX").expect("profile id");
+    let id = ProfileId::from_brand_model("Telstar", None);
 
     assert_eq!(id.brand, "telstar");
-    assert_eq!(id.model, "xxx");
-    assert_eq!(id.key(), "telstar/xxx");
+    assert_eq!(id.model, "generic");
+    assert_eq!(id.key(), "telstar/generic");
     assert_eq!(
         id.relative_path().to_string_lossy().replace('\\', "/"),
-        "tv/telstar/xxx.toml"
+        "tv/telstar/generic.toml"
+    );
+
+    let model_id = ProfileId::from_brand_model("Telstar", Some("TTC04"));
+    assert_eq!(model_id.brand, "telstar");
+    assert_eq!(model_id.model, "ttc04");
+    assert_eq!(model_id.key(), "telstar/ttc04");
+    assert_eq!(
+        model_id
+            .relative_path()
+            .to_string_lossy()
+            .replace('\\', "/"),
+        "tv/telstar/ttc04.toml"
     );
 }
 
@@ -57,16 +69,19 @@ fn profile_store_lists_brands_and_models() {
     let root = tempdir().expect("temp root");
     let profile_path = root.path().join("tv").join("telstar");
     std::fs::create_dir_all(&profile_path).expect("profile dir");
-    std::fs::write(profile_path.join("xxx.toml"), TELSTAR_PROFILE).expect("profile file");
+    std::fs::write(profile_path.join("generic.toml"), TELSTAR_PROFILE).expect("profile file");
 
     let store = ProfileStore::new(root.path());
 
     assert_eq!(store.list_brands().expect("brands"), vec!["telstar"]);
     assert_eq!(
         store.list_models("telstar").expect("models"),
-        vec!["xxx".to_string()]
+        vec!["generic".to_string()]
     );
-    assert_eq!(store.load("telstar xxx").expect("load").model, "xxx");
+    assert_eq!(
+        store.load_brand_model("telstar", None).expect("load").model,
+        "generic"
+    );
 }
 
 #[test]
@@ -74,7 +89,7 @@ fn config_store_persists_active_profile() {
     let root = tempdir().expect("temp root");
     let store = ConfigStore::new(root.path());
     let config = AppConfig {
-        active_profile: Some("telstar/xxx".to_string()),
+        active_profile: Some("telstar/generic".to_string()),
         gpio_pin: 23,
         ..AppConfig::default()
     };
@@ -82,7 +97,7 @@ fn config_store_persists_active_profile() {
     store.save(&config).expect("save config");
     let loaded = store.load().expect("load config");
 
-    assert_eq!(loaded.active_profile.as_deref(), Some("telstar/xxx"));
+    assert_eq!(loaded.active_profile.as_deref(), Some("telstar/generic"));
     assert_eq!(loaded.gpio_pin, 23);
 }
 

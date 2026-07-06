@@ -11,6 +11,13 @@ pub struct ProfileId {
 }
 
 impl ProfileId {
+    pub fn from_brand_model(brand: &str, model: Option<&str>) -> Self {
+        Self {
+            brand: slug(brand),
+            model: model.map(slug).unwrap_or_else(|| "generic".to_string()),
+        }
+    }
+
     pub fn parse(input: &str) -> Result<Self, IrisError> {
         let normalized = input.trim().replace('\\', "/");
         let parts: Vec<&str> = if normalized.contains('/') {
@@ -132,6 +139,15 @@ impl ProfileStore {
 
     pub fn load(&self, input: &str) -> Result<Profile, IrisError> {
         let id = ProfileId::parse(input)?;
+        self.load_id(&id)
+    }
+
+    pub fn load_brand_model(&self, brand: &str, model: Option<&str>) -> Result<Profile, IrisError> {
+        let id = ProfileId::from_brand_model(brand, model);
+        self.load_id(&id)
+    }
+
+    fn load_id(&self, id: &ProfileId) -> Result<Profile, IrisError> {
         let path = self.root.join(id.relative_path());
         if !path.exists() {
             return Err(IrisError::ProfileNotFound { profile: id.key() });

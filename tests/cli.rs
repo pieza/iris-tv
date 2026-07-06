@@ -4,7 +4,7 @@ use tempfile::tempdir;
 
 const TELSTAR_PROFILE: &str = r#"
 brand = "telstar"
-model = "xxx"
+model = "generic"
 device_type = "tv"
 carrier_frequency = 38000
 protocol = "nec"
@@ -19,16 +19,16 @@ fn start_saves_active_profile_and_send_uses_it() {
     let profile_dir = tempdir().expect("profile dir");
     let telstar_dir = profile_dir.path().join("tv").join("telstar");
     std::fs::create_dir_all(&telstar_dir).expect("profile dirs");
-    std::fs::write(telstar_dir.join("xxx.toml"), TELSTAR_PROFILE).expect("profile");
+    std::fs::write(telstar_dir.join("generic.toml"), TELSTAR_PROFILE).expect("profile");
 
     Command::cargo_bin("iris")
         .expect("binary")
         .env("IRIS_CONFIG_DIR", config_dir.path())
         .env("IRIS_PROFILE_DIR", profile_dir.path())
-        .args(["start", "telstar xxx"])
+        .args(["start", "telstar"])
         .assert()
         .success()
-        .stdout(contains("Loaded active profile telstar/xxx"));
+        .stdout(contains("Loaded active profile telstar/generic"));
 
     Command::cargo_bin("iris")
         .expect("binary")
@@ -40,4 +40,26 @@ fn start_saves_active_profile_and_send_uses_it() {
         .stdout(contains("NEC"))
         .stdout(contains("0x00FF"))
         .stdout(contains("0xA25D"));
+}
+
+#[test]
+fn start_accepts_optional_model() {
+    let config_dir = tempdir().expect("config dir");
+    let profile_dir = tempdir().expect("profile dir");
+    let telstar_dir = profile_dir.path().join("tv").join("telstar");
+    std::fs::create_dir_all(&telstar_dir).expect("profile dirs");
+    std::fs::write(
+        telstar_dir.join("ttc04.toml"),
+        TELSTAR_PROFILE.replace("generic", "ttc04"),
+    )
+    .expect("profile");
+
+    Command::cargo_bin("iris")
+        .expect("binary")
+        .env("IRIS_CONFIG_DIR", config_dir.path())
+        .env("IRIS_PROFILE_DIR", profile_dir.path())
+        .args(["start", "telstar", "--model", "TTC04"])
+        .assert()
+        .success()
+        .stdout(contains("Loaded active profile telstar/ttc04"));
 }

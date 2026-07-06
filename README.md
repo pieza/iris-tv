@@ -103,7 +103,13 @@ RUST_LOG=debug iris send power
 Load a profile:
 
 ```bash
-iris start "telstar xxx"
+iris start telstar
+```
+
+Load a model-specific profile when you have captured codes for that model:
+
+```bash
+iris start telstar --model TTC04
 ```
 
 Send commands using the active profile:
@@ -132,7 +138,7 @@ List and inspect profiles:
 ```bash
 iris list brands
 iris list models telstar
-iris profile show "telstar xxx"
+iris profile show telstar/generic
 iris status
 ```
 
@@ -148,7 +154,7 @@ Example:
 
 ```toml
 brand = "telstar"
-model = "xxx"
+model = "generic"
 device_type = "tv"
 carrier_frequency = 38000
 protocol = "nec"
@@ -162,13 +168,13 @@ raw_demo = { type = "raw", frequency = 38000, pulses = [9000, 4500, 560, 560] }
 To add a new TV, create a new TOML file such as:
 
 ```text
-profiles/tv/samsung/living_room.toml
+profiles/tv/telstar/ttc04.toml
 ```
 
 Then load it:
 
 ```bash
-iris start "samsung living_room"
+iris start telstar --model TTC04
 ```
 
 The included Telstar codes are templates. Telstar remotes may vary by model, so replace the values after capturing the real remote codes.
@@ -178,13 +184,13 @@ The included Telstar codes are templates. Telstar remotes may vary by model, so 
 Run a foreground local API server:
 
 ```bash
-iris serve "telstar xxx"
+iris serve telstar
 ```
 
 Run it in the background:
 
 ```bash
-iris daemon start "telstar xxx"
+iris daemon start telstar
 iris daemon stop
 ```
 

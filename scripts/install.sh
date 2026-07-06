@@ -63,4 +63,4 @@ $SUDO cp -R "${TMP_DIR}/iris/profiles" /usr/local/share/iris/profiles
 
 echo "IRIS installed to /usr/local/bin/iris"
 echo "Profiles installed to /usr/local/share/iris/profiles"
-echo "Try: iris start \"telstar xxx\""
+echo "Try: iris start telstar"

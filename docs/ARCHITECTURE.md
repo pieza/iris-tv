@@ -14,7 +14,7 @@ IRIS is split into small modules so GPIO access, profile parsing, command handli
 
 ## Data Flow
 
-`iris start "telstar xxx"` resolves the requested profile, validates its TOML, and saves `telstar/xxx` as the active profile in the user config.
+`iris start telstar` resolves the generic Telstar profile, validates its TOML, and saves `telstar/generic` as the active profile in the user config. `iris start telstar --model TTC04` resolves a model-specific `telstar/ttc04` profile when one exists.
 
 `iris send power` loads the active profile, resolves `power` to an `IrSignal`, selects the configured transmitter, and sends the signal with the configured repeat count.
 

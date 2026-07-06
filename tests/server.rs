@@ -7,7 +7,7 @@ use tower::ServiceExt;
 
 const TELSTAR_PROFILE: &str = r#"
 brand = "telstar"
-model = "xxx"
+model = "generic"
 device_type = "tv"
 carrier_frequency = 38000
 protocol = "nec"

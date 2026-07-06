@@ -20,9 +20,7 @@ pub struct Cli {
 
 #[derive(Debug, Subcommand)]
 pub enum Commands {
-    Start {
-        profile: String,
-    },
+    Start(DeviceArgs),
     Send(SendArgs),
     List {
         #[command(subcommand)]
@@ -40,9 +38,7 @@ pub enum Commands {
         #[command(subcommand)]
         command: DaemonCommands,
     },
-    Serve {
-        profile: String,
-    },
+    Serve(DeviceArgs),
     Status,
 }
 
@@ -53,6 +49,13 @@ pub struct SendArgs {
     pub repeat: Option<u32>,
     #[arg(long)]
     pub dry_run: bool,
+}
+
+#[derive(Debug, Args)]
+pub struct DeviceArgs {
+    pub brand: String,
+    #[arg(long)]
+    pub model: Option<String>,
 }
 
 #[derive(Debug, Subcommand)]
@@ -73,7 +76,7 @@ pub enum ConfigCommands {
 
 #[derive(Debug, Subcommand)]
 pub enum DaemonCommands {
-    Start { profile: String },
+    Start(DeviceArgs),
     Stop,
 }
 
@@ -82,13 +85,13 @@ pub async fn run(cli: Cli) -> Result<(), IrisError> {
     let profile_store = ProfileStore::new(default_profile_root());
 
     match cli.command {
-        Commands::Start { profile } => start_profile(&config_store, &profile_store, &profile),
+        Commands::Start(args) => start_profile(&config_store, &profile_store, &args),
         Commands::Send(args) => send_command(&config_store, &profile_store, args),
         Commands::List { command } => list_command(&profile_store, command),
         Commands::Profile { command } => profile_command(&profile_store, command),
         Commands::Config { command } => config_command(&config_store, command),
         Commands::Daemon { command } => daemon_command(&config_store, &profile_store, command),
-        Commands::Serve { profile } => serve(&config_store, &profile_store, &profile).await,
+        Commands::Serve(args) => serve(&config_store, &profile_store, &args).await,
         Commands::Status => status(&config_store),
     }
 }
@@ -96,9 +99,9 @@ pub async fn run(cli: Cli) -> Result<(), IrisError> {
 fn start_profile(
     config_store: &ConfigStore,
     profile_store: &ProfileStore,
-    profile: &str,
+    args: &DeviceArgs,
 ) -> Result<(), IrisError> {
-    let loaded = profile_store.load(profile)?;
+    let loaded = profile_store.load_brand_model(&args.brand, args.model.as_deref())?;
     let mut config = config_store.load()?;
     config.active_profile = Some(loaded.id());
     config_store.save(&config)?;
@@ -182,8 +185,8 @@ fn daemon_command(
 ) -> Result<(), IrisError> {
     let state_dir = default_state_dir()?;
     match command {
-        DaemonCommands::Start { profile } => {
-            let loaded = profile_store.load(&profile)?;
+        DaemonCommands::Start(args) => {
+            let loaded = profile_store.load_brand_model(&args.brand, args.model.as_deref())?;
             let mut config = config_store.load()?;
             config.active_profile = Some(loaded.id());
             config_store.save(&config)?;
@@ -201,9 +204,9 @@ fn daemon_command(
 async fn serve(
     config_store: &ConfigStore,
     profile_store: &ProfileStore,
-    profile: &str,
+    args: &DeviceArgs,
 ) -> Result<(), IrisError> {
-    let loaded = profile_store.load(profile)?;
+    let loaded = profile_store.load_brand_model(&args.brand, args.model.as_deref())?;
     let mut config = config_store.load()?;
     config.active_profile = Some(loaded.id());
     config_store.save(&config)?;

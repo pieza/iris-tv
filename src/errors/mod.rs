@@ -5,7 +5,7 @@ pub enum IrisError {
     #[error("profile not found: {profile}")]
     ProfileNotFound { profile: String },
 
-    #[error("no active profile is configured; run `iris start \"brand model\"` first")]
+    #[error("no active profile is configured; run `iris start <brand>` first")]
     ActiveProfileMissing,
 
     #[error("command `{command}` does not exist in profile `{profile}`")]
