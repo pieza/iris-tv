@@ -1,7 +1,7 @@
 use crate::config::{AppConfig, ConfigStore, default_profile_root, default_state_dir};
 use crate::daemon;
 use crate::errors::IrisError;
-use crate::ir::{DryRunTransmitter, IrTransmitter, RppalTransmitter};
+use crate::ir::{DryRunTransmitter, IrSignal, IrTransmitter, RppalTransmitter, describe_signal};
 use crate::profiles::{ProfileId, ProfileStore};
 use crate::server;
 use clap::{Args, Parser, Subcommand};
@@ -22,6 +22,7 @@ pub struct Cli {
 pub enum Commands {
     Start(DeviceArgs),
     Send(SendArgs),
+    Scan(ScanArgs),
     List {
         #[command(subcommand)]
         command: ListCommands,
@@ -53,6 +54,16 @@ pub struct SendArgs {
     pub repeat: Option<u32>,
     #[arg(long)]
     pub dry_run: bool,
+}
+
+#[derive(Debug, Args)]
+pub struct ScanArgs {
+    #[arg(default_value = "power")]
+    pub command: String,
+    #[arg(long)]
+    pub dry_run: bool,
+    #[arg(long, help = "Do not wait for Enter between candidates")]
+    pub yes: bool,
 }
 
 #[derive(Debug, Args)]
@@ -96,6 +107,7 @@ pub async fn run(cli: Cli) -> Result<(), IrisError> {
     match cli.command {
         Commands::Start(args) => start_profile(&config_store, &profile_store, &args),
         Commands::Send(args) => send_command(&config_store, &profile_store, args),
+        Commands::Scan(args) => scan_command(&config_store, args),
         Commands::List { command } => list_command(&profile_store, command),
         Commands::Profile { command } => profile_command(&profile_store, command),
         Commands::Config { command } => config_command(&config_store, command),
@@ -104,6 +116,103 @@ pub async fn run(cli: Cli) -> Result<(), IrisError> {
         Commands::Serve(args) => serve(&config_store, &profile_store, &args).await,
         Commands::Status => status(&config_store),
     }
+}
+
+#[derive(Debug, Clone)]
+struct ScanCandidate {
+    name: &'static str,
+    signal: IrSignal,
+    frequency: u32,
+}
+
+fn scan_command(config_store: &ConfigStore, args: ScanArgs) -> Result<(), IrisError> {
+    if args.command != "power" {
+        return Err(IrisError::CommandNotFound {
+            command: args.command,
+            profile: "scan".to_string(),
+        });
+    }
+
+    let config = config_store.load()?;
+    let candidates = power_scan_candidates();
+    println!("Scanning power candidates ({})", candidates.len());
+    println!("Point the IR LED at the TV. Press Enter to send each candidate.");
+
+    for (idx, candidate) in candidates.iter().enumerate() {
+        if !args.yes {
+            println!(
+                "[{}/{}] Press Enter to try {}",
+                idx + 1,
+                candidates.len(),
+                candidate.name
+            );
+            let mut line = String::new();
+            std::io::stdin().read_line(&mut line)?;
+        }
+
+        println!(
+            "[{}/{}] {}: {}",
+            idx + 1,
+            candidates.len(),
+            candidate.name,
+            describe_signal(&candidate.signal, 1)
+        );
+
+        if args.dry_run {
+            continue;
+        }
+
+        let tx = RppalTransmitter::new(config.gpio_pin, candidate.frequency)?;
+        tx.send(candidate.signal.clone(), 1)?;
+    }
+
+    println!("Scan complete. If one worked, note its candidate name.");
+    Ok(())
+}
+
+fn power_scan_candidates() -> Vec<ScanCandidate> {
+    vec![
+        ScanCandidate {
+            name: "tcl_nikai_power",
+            signal: IrSignal::Nikai {
+                data: 0x0D5F2A,
+                bits: 24,
+            },
+            frequency: 38_000,
+        },
+        ScanCandidate {
+            name: "tcl_nikai_power_alt_1",
+            signal: IrSignal::Nikai {
+                data: 0x0CF30C,
+                bits: 24,
+            },
+            frequency: 38_000,
+        },
+        ScanCandidate {
+            name: "nec_00ff_a25d",
+            signal: IrSignal::Nec {
+                address: 0x00FF,
+                command: 0xA25D,
+            },
+            frequency: 38_000,
+        },
+        ScanCandidate {
+            name: "nec_807f_02fd",
+            signal: IrSignal::Nec {
+                address: 0x807F,
+                command: 0x02FD,
+            },
+            frequency: 38_000,
+        },
+        ScanCandidate {
+            name: "nec_04fb_08f7",
+            signal: IrSignal::Nec {
+                address: 0x04FB,
+                command: 0x08F7,
+            },
+            frequency: 38_000,
+        },
+    ]
 }
 
 fn start_profile(
