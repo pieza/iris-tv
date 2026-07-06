@@ -42,7 +42,7 @@ curl -fsSL https://raw.githubusercontent.com/pieza/iris-tv/main/scripts/install.
 Install a specific version:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/pieza/iris-tv/main/scripts/install.sh | bash -s -- V1.4.0
+curl -fsSL https://raw.githubusercontent.com/pieza/iris-tv/main/scripts/install.sh | bash -s -- V1.5.0
 ```
 
 The installer downloads the release asset, installs `iris` to `/usr/local/bin/iris`, and installs editable profiles to `/usr/local/share/iris/profiles`.
@@ -137,7 +137,11 @@ Try candidate power codes interactively:
 iris scan power
 ```
 
-IRIS sends one candidate at a time and waits for Enter before the next one. If a code works, note the candidate name printed in the terminal.
+IRIS sends one candidate at a time and waits for Enter before the next one. If a code works, note the candidate name printed in the terminal. Use `--repeat` to send each candidate multiple times:
+
+```bash
+iris scan power --repeat 5
+```
 
 Repeat a command:
 

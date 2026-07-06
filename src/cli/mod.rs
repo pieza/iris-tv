@@ -62,6 +62,8 @@ pub struct ScanArgs {
     pub command: String,
     #[arg(long)]
     pub dry_run: bool,
+    #[arg(long)]
+    pub repeat: Option<u32>,
     #[arg(long, help = "Do not wait for Enter between candidates")]
     pub yes: bool,
 }
@@ -135,8 +137,10 @@ fn scan_command(config_store: &ConfigStore, args: ScanArgs) -> Result<(), IrisEr
 
     let config = config_store.load()?;
     let candidates = power_scan_candidates();
+    let repeat = args.repeat.unwrap_or(config.default_repeat).max(1);
     println!("Scanning power candidates ({})", candidates.len());
     println!("Point the IR LED at the TV. Press Enter to send each candidate.");
+    println!("repeat = {repeat}");
 
     for (idx, candidate) in candidates.iter().enumerate() {
         if !args.yes {
@@ -155,7 +159,7 @@ fn scan_command(config_store: &ConfigStore, args: ScanArgs) -> Result<(), IrisEr
             idx + 1,
             candidates.len(),
             candidate.name,
-            describe_signal(&candidate.signal, 1)
+            describe_signal(&candidate.signal, repeat)
         );
 
         if args.dry_run {
@@ -163,7 +167,7 @@ fn scan_command(config_store: &ConfigStore, args: ScanArgs) -> Result<(), IrisEr
         }
 
         let tx = RppalTransmitter::new(config.gpio_pin, candidate.frequency)?;
-        tx.send(candidate.signal.clone(), 1)?;
+        tx.send(candidate.signal.clone(), repeat)?;
     }
 
     println!("Scan complete. If one worked, note its candidate name.");
@@ -181,9 +185,57 @@ fn power_scan_candidates() -> Vec<ScanCandidate> {
             frequency: 38_000,
         },
         ScanCandidate {
+            name: "tcl_nikai_power_36khz",
+            signal: IrSignal::Nikai {
+                data: 0x0D5F2A,
+                bits: 24,
+            },
+            frequency: 36_000,
+        },
+        ScanCandidate {
+            name: "tcl_nikai_power_40khz",
+            signal: IrSignal::Nikai {
+                data: 0x0D5F2A,
+                bits: 24,
+            },
+            frequency: 40_000,
+        },
+        ScanCandidate {
             name: "tcl_nikai_power_alt_1",
             signal: IrSignal::Nikai {
                 data: 0x0CF30C,
+                bits: 24,
+            },
+            frequency: 38_000,
+        },
+        ScanCandidate {
+            name: "tcl_nikai_power_alt_1_36khz",
+            signal: IrSignal::Nikai {
+                data: 0x0CF30C,
+                bits: 24,
+            },
+            frequency: 36_000,
+        },
+        ScanCandidate {
+            name: "tcl_nikai_power_alt_1_40khz",
+            signal: IrSignal::Nikai {
+                data: 0x0CF30C,
+                bits: 24,
+            },
+            frequency: 40_000,
+        },
+        ScanCandidate {
+            name: "tcl_nikai_power_alt_2",
+            signal: IrSignal::Nikai {
+                data: 0x0CFF30,
+                bits: 24,
+            },
+            frequency: 38_000,
+        },
+        ScanCandidate {
+            name: "tcl_nikai_power_alt_3",
+            signal: IrSignal::Nikai {
+                data: 0x0D0F2F,
                 bits: 24,
             },
             frequency: 38_000,
@@ -197,6 +249,22 @@ fn power_scan_candidates() -> Vec<ScanCandidate> {
             frequency: 38_000,
         },
         ScanCandidate {
+            name: "nec_00ff_45ba",
+            signal: IrSignal::Nec {
+                address: 0x00FF,
+                command: 0x45BA,
+            },
+            frequency: 38_000,
+        },
+        ScanCandidate {
+            name: "nec_00ff_e21d",
+            signal: IrSignal::Nec {
+                address: 0x00FF,
+                command: 0xE21D,
+            },
+            frequency: 38_000,
+        },
+        ScanCandidate {
             name: "nec_807f_02fd",
             signal: IrSignal::Nec {
                 address: 0x807F,
@@ -205,10 +273,146 @@ fn power_scan_candidates() -> Vec<ScanCandidate> {
             frequency: 38_000,
         },
         ScanCandidate {
+            name: "nec_807f_12ed",
+            signal: IrSignal::Nec {
+                address: 0x807F,
+                command: 0x12ED,
+            },
+            frequency: 38_000,
+        },
+        ScanCandidate {
+            name: "nec_807f_48b7",
+            signal: IrSignal::Nec {
+                address: 0x807F,
+                command: 0x48B7,
+            },
+            frequency: 38_000,
+        },
+        ScanCandidate {
             name: "nec_04fb_08f7",
             signal: IrSignal::Nec {
                 address: 0x04FB,
                 command: 0x08F7,
+            },
+            frequency: 38_000,
+        },
+        ScanCandidate {
+            name: "nec_04fb_0cf3",
+            signal: IrSignal::Nec {
+                address: 0x04FB,
+                command: 0x0CF3,
+            },
+            frequency: 38_000,
+        },
+        ScanCandidate {
+            name: "nec_e0e0_40bf",
+            signal: IrSignal::Nec {
+                address: 0xE0E0,
+                command: 0x40BF,
+            },
+            frequency: 38_000,
+        },
+        ScanCandidate {
+            name: "nec_e0e0_f20d",
+            signal: IrSignal::Nec {
+                address: 0xE0E0,
+                command: 0xF20D,
+            },
+            frequency: 38_000,
+        },
+        ScanCandidate {
+            name: "nec_20df_10ef",
+            signal: IrSignal::Nec {
+                address: 0x20DF,
+                command: 0x10EF,
+            },
+            frequency: 38_000,
+        },
+        ScanCandidate {
+            name: "nec_20df_23dc",
+            signal: IrSignal::Nec {
+                address: 0x20DF,
+                command: 0x23DC,
+            },
+            frequency: 38_000,
+        },
+        ScanCandidate {
+            name: "nec_bf40_12ed",
+            signal: IrSignal::Nec {
+                address: 0xBF40,
+                command: 0x12ED,
+            },
+            frequency: 38_000,
+        },
+        ScanCandidate {
+            name: "nec_7f80_02fd",
+            signal: IrSignal::Nec {
+                address: 0x7F80,
+                command: 0x02FD,
+            },
+            frequency: 38_000,
+        },
+        ScanCandidate {
+            name: "nec_f708_fb04",
+            signal: IrSignal::Nec {
+                address: 0xF708,
+                command: 0xFB04,
+            },
+            frequency: 38_000,
+        },
+        ScanCandidate {
+            name: "nec_f20d_e01f",
+            signal: IrSignal::Nec {
+                address: 0xF20D,
+                command: 0xE01F,
+            },
+            frequency: 38_000,
+        },
+        ScanCandidate {
+            name: "nec_10ef_0ff0",
+            signal: IrSignal::Nec {
+                address: 0x10EF,
+                command: 0x0FF0,
+            },
+            frequency: 38_000,
+        },
+        ScanCandidate {
+            name: "nec_1fe0_08f7",
+            signal: IrSignal::Nec {
+                address: 0x1FE0,
+                command: 0x08F7,
+            },
+            frequency: 38_000,
+        },
+        ScanCandidate {
+            name: "nec_df20_10ef",
+            signal: IrSignal::Nec {
+                address: 0xDF20,
+                command: 0x10EF,
+            },
+            frequency: 38_000,
+        },
+        ScanCandidate {
+            name: "nec_ff00_a25d",
+            signal: IrSignal::Nec {
+                address: 0xFF00,
+                command: 0xA25D,
+            },
+            frequency: 38_000,
+        },
+        ScanCandidate {
+            name: "nec_0af5_10ef",
+            signal: IrSignal::Nec {
+                address: 0x0AF5,
+                command: 0x10EF,
+            },
+            frequency: 38_000,
+        },
+        ScanCandidate {
+            name: "nec_40bf_12ed",
+            signal: IrSignal::Nec {
+                address: 0x40BF,
+                command: 0x12ED,
             },
             frequency: 38_000,
         },
