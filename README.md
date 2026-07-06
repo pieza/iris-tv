@@ -1,8 +1,8 @@
 # IRIS
 
-[![Release](https://img.shields.io/github/v/release/pieza/iris-tv?label=release)](https://github.com/pieza/iris-tv/releases)
-[![Build](https://github.com/pieza/iris-tv/actions/workflows/build.yml/badge.svg)](https://github.com/pieza/iris-tv/actions/workflows/build.yml)
-[![Test](https://github.com/pieza/iris-tv/actions/workflows/test.yml/badge.svg)](https://github.com/pieza/iris-tv/actions/workflows/test.yml)
+[![Release](https://img.shields.io/github/v/release/pieza/iris-tv?display_name=tag&sort=semver)](https://github.com/pieza/iris-tv/releases)
+[![Build](https://img.shields.io/github/actions/workflow/status/pieza/iris-tv/build.yml?branch=main&label=build)](https://github.com/pieza/iris-tv/actions/workflows/build.yml)
+[![Test](https://img.shields.io/github/actions/workflow/status/pieza/iris-tv/test.yml?branch=main&label=test)](https://github.com/pieza/iris-tv/actions/workflows/test.yml)
 
 IRIS is a Rust CLI for turning an infrared-controlled TV into a command-driven TV through a Raspberry Pi 3. It loads editable TOML remote profiles and sends IR commands through a GPIO-connected infrared LED.
 
