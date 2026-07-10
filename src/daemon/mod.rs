@@ -2,7 +2,7 @@ use crate::errors::IrisError;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
-pub fn start(state_dir: &Path, profile: &str) -> Result<u32, IrisError> {
+pub fn start(state_dir: &Path) -> Result<u32, IrisError> {
     std::fs::create_dir_all(state_dir).map_err(|source| IrisError::io(state_dir, source))?;
     let pid_path = pid_path(state_dir);
     if let Some(pid) = read_pid(&pid_path)? {
@@ -15,7 +15,6 @@ pub fn start(state_dir: &Path, profile: &str) -> Result<u32, IrisError> {
     let exe = std::env::current_exe().map_err(IrisError::IoPlain)?;
     let child = Command::new(exe)
         .arg("serve")
-        .arg(profile)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())

@@ -72,6 +72,7 @@ impl ScanInput for TerminalInput {
 #[derive(Debug)]
 pub struct ScanSession {
     name: String,
+    device_type: String,
     carrier_frequency: u32,
     log_path: PathBuf,
     profile_path: PathBuf,
@@ -109,6 +110,7 @@ impl ScanSession {
             .map_err(|source| IrisError::io(&log_path, source))?;
         Ok(Self {
             name,
+            device_type: "tv".to_string(),
             carrier_frequency,
             log_path,
             profile_path,
@@ -119,6 +121,18 @@ impl ScanSession {
 
     pub fn name(&self) -> &str {
         &self.name
+    }
+
+    pub fn set_device_type(&mut self, device_type: &str) -> Result<(), IrisError> {
+        match device_type {
+            "tv" | "fan" => {
+                self.device_type = device_type.to_string();
+                Ok(())
+            }
+            _ => Err(IrisError::InvalidConfigKey {
+                key: "device_type".to_string(),
+            }),
+        }
     }
 
     pub fn log_path(&self) -> &Path {
@@ -157,7 +171,7 @@ impl ScanSession {
         let profile = LearnedProfile {
             brand: self.name.clone(),
             model: "learned".to_string(),
-            device_type: "tv".to_string(),
+            device_type: self.device_type.clone(),
             carrier_frequency: self.carrier_frequency,
             commands: self
                 .entries

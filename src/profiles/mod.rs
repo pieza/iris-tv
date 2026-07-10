@@ -1,6 +1,6 @@
 use crate::errors::IrisError;
 use crate::ir::IrSignal;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
@@ -68,7 +68,24 @@ pub struct Profile {
     pub device_type: String,
     pub carrier_frequency: Option<u32>,
     pub protocol: Option<String>,
+    #[serde(default)]
+    pub home_assistant: HomeAssistantProfile,
     pub commands: BTreeMap<String, CommandDefinition>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct HomeAssistantProfile {
+    #[serde(default)]
+    pub fan: Option<FanHomeAssistantProfile>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct FanHomeAssistantProfile {
+    pub power_on: Option<String>,
+    pub power_off: Option<String>,
+    pub oscillate: Option<String>,
+    #[serde(default)]
+    pub presets: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

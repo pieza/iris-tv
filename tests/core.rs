@@ -115,6 +115,46 @@ fn config_store_persists_active_profile() {
 }
 
 #[test]
+fn legacy_active_profile_migrates_to_default_registered_device() {
+    let root = tempdir().expect("temp root");
+    let store = ConfigStore::new(root.path());
+    std::fs::create_dir_all(root.path()).expect("config dir");
+    std::fs::write(
+        root.path().join("config.toml"),
+        "active_profile = \"telstar/generic\"\n",
+    )
+    .expect("legacy config");
+
+    let config = store.load().expect("load migrated config");
+    assert_eq!(config.default_device.as_deref(), Some("default"));
+    assert_eq!(
+        config.device(None).expect("default device").profile,
+        "telstar/generic"
+    );
+}
+
+#[test]
+fn configured_devices_can_be_added_selected_and_removed() {
+    let mut config = AppConfig::default();
+    config
+        .add_device(
+            "Living Room TV",
+            "Living Room TV".to_string(),
+            "telstar/generic".to_string(),
+        )
+        .expect("add tv");
+    config
+        .add_device("fan", "Bedroom Fan".to_string(), "generic/fan".to_string())
+        .expect("add fan");
+    config.use_device("fan").expect("use fan");
+
+    assert_eq!(config.default_device.as_deref(), Some("fan"));
+    assert_eq!(config.devices.len(), 2);
+    config.remove_device("fan").expect("remove fan");
+    assert_eq!(config.default_device.as_deref(), Some("living_room_tv"));
+}
+
+#[test]
 fn config_store_generates_and_persists_device_id_once() {
     let root = tempdir().expect("temp root");
     let store = ConfigStore::new(root.path());
@@ -156,7 +196,6 @@ fn home_assistant_setup_prepares_network_config_and_token() {
 
 #[test]
 fn mdns_service_info_contains_home_assistant_discovery_metadata() {
-    let profile = Profile::from_toml_str(TELSTAR_PROFILE).expect("profile parses");
     let config = AppConfig {
         device_id: Some("iris-test-device".to_string()),
         device_name: "Living Room IRIS".to_string(),
@@ -164,7 +203,7 @@ fn mdns_service_info_contains_home_assistant_discovery_metadata() {
         ..AppConfig::default()
     };
 
-    let service = discovery::build_service_info(&profile, &config).expect("service info");
+    let service = discovery::build_service_info(&config).expect("service info");
 
     assert_eq!(service.get_type(), "_iris-tv._tcp.local.");
     assert_eq!(service.get_port(), config.server_port);
@@ -173,9 +212,11 @@ fn mdns_service_info_contains_home_assistant_discovery_metadata() {
         service.get_property_val_str("name"),
         Some("Living Room IRIS")
     );
-    assert_eq!(service.get_property_val_str("brand"), Some("telstar"));
-    assert_eq!(service.get_property_val_str("model"), Some("generic"));
-    assert_eq!(service.get_property_val_str("api_version"), Some("1"));
+    assert_eq!(
+        service.get_property_val_str("bridge_id"),
+        Some("iris-test-device")
+    );
+    assert_eq!(service.get_property_val_str("api_version"), Some("2"));
     assert_eq!(service.get_property_val_str("auth_required"), Some("true"));
 }
 

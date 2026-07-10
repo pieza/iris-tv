@@ -4,7 +4,7 @@ use crate::errors::IrisError;
 use crate::ir::{DryRunTransmitter, IrTransmitter, RppalReceiver, RppalTransmitter};
 use crate::profiles::{ProfileId, ProfileStore};
 use crate::scan::{ScanSession, TerminalInput, prompt_session_name, run_interactive_session};
-use crate::server;
+use crate::server::{self, RegisteredDevice};
 use clap::{Args, Parser, Subcommand};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -24,6 +24,10 @@ pub struct Cli {
 pub enum Commands {
     Start(DeviceArgs),
     Send(SendArgs),
+    Device {
+        #[command(subcommand)]
+        command: DeviceCommands,
+    },
     List {
         #[command(subcommand)]
         command: ListCommands,
@@ -46,7 +50,7 @@ pub enum Commands {
     },
     /// Learn commands from an active-low demodulated IR receiver.
     Scan(ScanArgs),
-    Serve(DeviceArgs),
+    Serve(OptionalDeviceArgs),
     Status,
 }
 
@@ -57,12 +61,21 @@ pub struct SendArgs {
     pub repeat: Option<u32>,
     #[arg(long)]
     pub dry_run: bool,
+    #[arg(long)]
+    pub device: Option<String>,
 }
 
 #[derive(Debug, Args)]
 pub struct DeviceArgs {
     pub brand: String,
     #[arg(long)]
+    pub model: Option<String>,
+}
+
+#[derive(Debug, Args)]
+pub struct OptionalDeviceArgs {
+    pub brand: Option<String>,
+    #[arg(long, requires = "brand")]
     pub model: Option<String>,
 }
 
@@ -74,12 +87,35 @@ pub struct ScanArgs {
     /// Directory in which to create the session log and learned profile.
     #[arg(long)]
     pub path: Option<PathBuf>,
+    /// Type of learned device profile.
+    #[arg(long, default_value = "tv", value_parser = ["tv", "fan"])]
+    pub device_type: String,
 }
 
 #[derive(Debug, Subcommand)]
 pub enum ListCommands {
     Brands,
     Models { brand: String },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum DeviceCommands {
+    Add {
+        id: String,
+        profile: String,
+        #[arg(long)]
+        name: Option<String>,
+    },
+    List,
+    Show {
+        id: String,
+    },
+    Remove {
+        id: String,
+    },
+    Use {
+        id: String,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -94,7 +130,7 @@ pub enum ConfigCommands {
 
 #[derive(Debug, Subcommand)]
 pub enum DaemonCommands {
-    Start(DeviceArgs),
+    Start(OptionalDeviceArgs),
     Stop,
 }
 
@@ -110,13 +146,14 @@ pub async fn run(cli: Cli) -> Result<(), IrisError> {
     match cli.command {
         Commands::Start(args) => start_profile(&config_store, &profile_store, &args),
         Commands::Send(args) => send_command(&config_store, &profile_store, args),
+        Commands::Device { command } => device_command(&config_store, &profile_store, command),
         Commands::List { command } => list_command(&profile_store, command),
         Commands::Profile { command } => profile_command(&profile_store, command),
         Commands::Config { command } => config_command(&config_store, command),
         Commands::Daemon { command } => daemon_command(&config_store, &profile_store, command),
         Commands::HomeAssistant { command } => home_assistant_command(&config_store, command),
         Commands::Scan(args) => scan_command(&config_store, args),
-        Commands::Serve(args) => serve(&config_store, &profile_store, &args).await,
+        Commands::Serve(args) => serve(&config_store, &profile_store, args).await,
         Commands::Status => status(&config_store),
     }
 }
@@ -134,6 +171,7 @@ fn scan_command(config_store: &ConfigStore, args: ScanArgs) -> Result<(), IrisEr
     let mut receiver = RppalReceiver::new(config.receiver_gpio_pin, config.carrier_frequency)?;
     let mut session =
         ScanSession::new(&requested_name, output_directory, config.carrier_frequency)?;
+    session.set_device_type(&args.device_type)?;
     let mut input = TerminalInput::new()?;
     let mut stdout = std::io::stdout().lock();
     let profile_path =
@@ -155,7 +193,7 @@ fn start_profile(
 ) -> Result<(), IrisError> {
     let loaded = profile_store.load_brand_model(&args.brand, args.model.as_deref())?;
     let mut config = config_store.load()?;
-    config.active_profile = Some(loaded.id());
+    config.upsert_legacy_default(loaded.id());
     config_store.save(&config)?;
     println!("Loaded active profile {}", loaded.id());
     Ok(())
@@ -167,11 +205,8 @@ fn send_command(
     args: SendArgs,
 ) -> Result<(), IrisError> {
     let config = config_store.load()?;
-    let active_profile = config
-        .active_profile
-        .as_deref()
-        .ok_or(IrisError::ActiveProfileMissing)?;
-    let profile = profile_store.load(active_profile)?;
+    let device = config.device(args.device.as_deref())?;
+    let profile = profile_store.load(&device.profile)?;
     let signal = profile.signal_for(&args.command)?;
     let repeat = args.repeat.unwrap_or(config.default_repeat).max(1);
 
@@ -183,6 +218,53 @@ fn send_command(
 
     let tx = RppalTransmitter::new(config.gpio_pin, effective_frequency(&config, &profile))?;
     tx.send(signal, repeat)
+}
+
+fn device_command(
+    config_store: &ConfigStore,
+    profile_store: &ProfileStore,
+    command: DeviceCommands,
+) -> Result<(), IrisError> {
+    let mut config = config_store.load()?;
+    match command {
+        DeviceCommands::Add { id, profile, name } => {
+            let loaded = profile_store.load(&profile)?;
+            let name = name.unwrap_or_else(|| format!("{} {}", loaded.brand, loaded.model));
+            config.add_device(&id, name, loaded.id())?;
+            config_store.save(&config)?;
+            println!("Added device {id}");
+        }
+        DeviceCommands::List => {
+            for device in &config.devices {
+                let marker = if config.default_device.as_deref() == Some(device.id.as_str()) {
+                    "*"
+                } else {
+                    " "
+                };
+                println!(
+                    "{marker} {}\t{}\t{}",
+                    device.id, device.name, device.profile
+                );
+            }
+        }
+        DeviceCommands::Show { id } => {
+            let device = config.device(Some(&id))?;
+            println!("id = {}", device.id);
+            println!("name = {}", device.name);
+            println!("profile = {}", device.profile);
+        }
+        DeviceCommands::Remove { id } => {
+            config.remove_device(&id)?;
+            config_store.save(&config)?;
+            println!("Removed device {id}");
+        }
+        DeviceCommands::Use { id } => {
+            config.use_device(&id)?;
+            config_store.save(&config)?;
+            println!("Default device is now {id}");
+        }
+    }
+    Ok(())
 }
 
 fn list_command(profile_store: &ProfileStore, command: ListCommands) -> Result<(), IrisError> {
@@ -238,7 +320,7 @@ fn home_assistant_command(
         HomeAssistantCommands::Setup => {
             let config = config_store.prepare_home_assistant()?;
             println!("Home Assistant discovery is ready");
-            println!("device_id = {}", config.device_id.as_deref().unwrap_or(""));
+            println!("bridge_id = {}", config.device_id.as_deref().unwrap_or(""));
             println!("device_name = {}", config.device_name);
             println!("server = {}:{}", config.server_host, config.server_port);
             println!("api_token = {}", config.api_token.as_deref().unwrap_or(""));
@@ -258,12 +340,14 @@ fn daemon_command(
     let state_dir = default_state_dir()?;
     match command {
         DaemonCommands::Start(args) => {
-            let loaded = profile_store.load_brand_model(&args.brand, args.model.as_deref())?;
-            let mut config = config_store.load()?;
-            config.active_profile = Some(loaded.id());
-            config_store.save(&config)?;
-            let pid = daemon::start(&state_dir, &loaded.id())?;
-            println!("Started IRIS daemon for {} with PID {pid}", loaded.id());
+            if let Some(brand) = args.brand {
+                let loaded = profile_store.load_brand_model(&brand, args.model.as_deref())?;
+                let mut config = config_store.load()?;
+                config.upsert_legacy_default(loaded.id());
+                config_store.save(&config)?;
+            }
+            let pid = daemon::start(&state_dir)?;
+            println!("Started IRIS daemon with PID {pid}");
         }
         DaemonCommands::Stop => {
             daemon::stop(&state_dir)?;
@@ -276,26 +360,37 @@ fn daemon_command(
 async fn serve(
     config_store: &ConfigStore,
     profile_store: &ProfileStore,
-    args: &DeviceArgs,
+    args: OptionalDeviceArgs,
 ) -> Result<(), IrisError> {
-    let loaded = load_device_or_profile(profile_store, args)?;
     let mut config = config_store.load()?;
-    config.active_profile = Some(loaded.id());
-    config_store.save(&config)?;
-    let frequency = effective_frequency(&config, &loaded);
+    if let Some(brand) = args.brand {
+        let loaded = profile_store.load_brand_model(&brand, args.model.as_deref())?;
+        config.upsert_legacy_default(loaded.id());
+        config_store.save(&config)?;
+    }
+    let devices = load_registered_devices(profile_store, &config)?;
+    let frequency = config.carrier_frequency;
     let transmitter = Arc::new(RppalTransmitter::new(config.gpio_pin, frequency)?);
-    server::serve(loaded, config, transmitter).await
+    server::serve(devices, config, transmitter).await
 }
 
-fn load_device_or_profile(
+fn load_registered_devices(
     profile_store: &ProfileStore,
-    args: &DeviceArgs,
-) -> Result<crate::profiles::Profile, IrisError> {
-    if args.model.is_none() && args.brand.contains('/') {
-        profile_store.load(&args.brand)
-    } else {
-        profile_store.load_brand_model(&args.brand, args.model.as_deref())
+    config: &AppConfig,
+) -> Result<Vec<RegisteredDevice>, IrisError> {
+    if config.devices.is_empty() {
+        return Err(IrisError::DefaultDeviceMissing);
     }
+    config
+        .devices
+        .iter()
+        .map(|device| {
+            Ok(RegisteredDevice {
+                config: device.clone(),
+                profile: profile_store.load(&device.profile)?,
+            })
+        })
+        .collect()
 }
 
 fn status(config_store: &ConfigStore) -> Result<(), IrisError> {
@@ -306,6 +401,11 @@ fn status(config_store: &ConfigStore) -> Result<(), IrisError> {
     );
     println!("gpio_pin = {}", config.gpio_pin);
     println!("receiver_gpio_pin = {}", config.receiver_gpio_pin);
+    println!(
+        "default_device = {}",
+        config.default_device.as_deref().unwrap_or("<none>")
+    );
+    println!("devices = {}", config.devices.len());
     println!("carrier_frequency = {}", config.carrier_frequency);
     println!("server = {}:{}", config.server_host, config.server_port);
     println!(

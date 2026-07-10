@@ -1,11 +1,10 @@
 use crate::config::AppConfig;
 use crate::errors::IrisError;
-use crate::profiles::Profile;
 use mdns_sd::{ServiceDaemon, ServiceInfo};
 use std::net::IpAddr;
 
 pub const IRIS_SERVICE_TYPE: &str = "_iris-tv._tcp.local.";
-const API_VERSION: &str = "1";
+const API_VERSION: &str = "2";
 
 pub struct DiscoveryAdvertisement {
     daemon: ServiceDaemon,
@@ -31,15 +30,12 @@ pub fn should_advertise(config: &AppConfig) -> bool {
         .unwrap_or(false)
 }
 
-pub fn register(
-    profile: &Profile,
-    config: &AppConfig,
-) -> Result<Option<DiscoveryAdvertisement>, IrisError> {
+pub fn register(config: &AppConfig) -> Result<Option<DiscoveryAdvertisement>, IrisError> {
     if !should_advertise(config) {
         return Ok(None);
     }
 
-    let service = build_service_info(profile, config)?;
+    let service = build_service_info(config)?;
     let fullname = service.get_fullname().to_string();
     let daemon = ServiceDaemon::new().map_err(|err| IrisError::Discovery(err.to_string()))?;
     daemon
@@ -48,14 +44,14 @@ pub fn register(
     Ok(Some(DiscoveryAdvertisement { daemon, fullname }))
 }
 
-pub fn build_service_info(profile: &Profile, config: &AppConfig) -> Result<ServiceInfo, IrisError> {
+pub fn build_service_info(config: &AppConfig) -> Result<ServiceInfo, IrisError> {
     let device_id = config
         .device_id
         .as_deref()
         .filter(|id| !id.is_empty())
         .unwrap_or("iris-tv");
     let instance_name = if config.device_name.trim().is_empty() {
-        format!("IRIS {} TV", profile.brand)
+        "IRIS Hub".to_string()
     } else {
         config.device_name.clone()
     };
@@ -67,9 +63,8 @@ pub fn build_service_info(profile: &Profile, config: &AppConfig) -> Result<Servi
         .to_string();
     let properties = [
         ("id", device_id.to_string()),
+        ("bridge_id", device_id.to_string()),
         ("name", instance_name.clone()),
-        ("brand", profile.brand.clone()),
-        ("model", profile.model.clone()),
         ("api_version", API_VERSION.to_string()),
         ("auth_required", auth_required),
     ];

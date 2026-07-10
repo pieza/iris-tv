@@ -52,7 +52,7 @@ curl -fsSL https://raw.githubusercontent.com/pieza/iris-tv/main/scripts/install.
 Install a specific version:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/pieza/iris-tv/main/scripts/install.sh | bash -s -- V1.5.1
+curl -fsSL https://raw.githubusercontent.com/pieza/iris-tv/main/scripts/install.sh | bash -s -- V1.6.0
 ```
 
 The installer downloads the release asset, installs `iris` to `/usr/local/bin/iris`, and installs editable profiles to `/usr/local/share/iris/profiles`.
@@ -87,7 +87,6 @@ Default values:
 gpio_pin = 18
 receiver_gpio_pin = 23
 carrier_frequency = 38000
-active_profile = "telstar/generic"
 default_repeat = 1
 log_level = "info"
 server_host = "127.0.0.1"
@@ -164,6 +163,43 @@ iris profile show telstar/generic
 iris status
 ```
 
+## Multiple Devices
+
+IRIS can control multiple infrared devices through the same LED. Register each physical device with a stable name and profile, then run one server for all of them:
+
+```bash
+iris device add living-room-tv telstar/generic --name "Living Room TV"
+iris device add bedroom-fan <fan-brand>/<fan-model> --name "Bedroom Fan"
+iris device list
+iris device use living-room-tv
+
+iris send power
+iris send power --device bedroom_fan
+iris daemon start
+```
+
+This creates config entries like:
+
+```toml
+default_device = "living_room_tv"
+
+[[devices]]
+id = "living_room_tv"
+name = "Living Room TV"
+profile = "telstar/generic"
+
+[[devices]]
+id = "bedroom_fan"
+name = "Bedroom Fan"
+profile = "fan_brand/fan_model"
+```
+
+IRIS sends through one bounded FIFO hardware queue, so waveforms never overlap. If the queue is full, the API returns `429 Too Many Requests` rather than sending colliding pulses. Direct CLI sends also use the same operating-system lock as the daemon.
+
+`iris serve` and `iris daemon start` now serve all registered devices. The older `iris serve telstar` and `iris daemon start telstar` forms remain available and update the compatible `default` device.
+
+Existing single-profile configurations are migrated automatically to a `default` device. `iris start telstar` continues to select that device for existing scripts.
+
 ## Profiles
 
 Profiles live under:
@@ -215,18 +251,34 @@ The session shows `press Esc to finish`. Aim the remote at the receiver and pres
 
 Accepted captures are appended immediately to the readable `.txt` session log using the entered label. On finish, the `.toml` file is generated as a usable `brand = "living_room_tv"`, `model = "learned"` profile; recognized codes use NEC or Nikai commands and all other captures use raw timings. IRIS refuses to start if either output file already exists, so it never overwrites a prior learning session.
 
+Use `--device-type fan` when learning a fan profile. Fan profiles can declare Home Assistant controls without hardcoding them in IRIS:
+
+```toml
+device_type = "fan"
+
+[home_assistant.fan]
+power_on = "power_on"
+power_off = "power_off"
+oscillate = "oscillate"
+
+[home_assistant.fan.presets]
+low = "speed_low"
+medium = "speed_medium"
+high = "speed_high"
+```
+
 ## Local Server
 
 Run a foreground local API server:
 
 ```bash
-iris serve telstar
+iris serve
 ```
 
 Run it in the background:
 
 ```bash
-iris daemon start telstar
+iris daemon start
 iris daemon stop
 ```
 
@@ -240,6 +292,11 @@ Endpoints:
 
 ```text
 GET  /health
+GET  /devices
+GET  /devices/{device_id}
+POST /devices/{device_id}/send/{command}
+
+# compatibility aliases for the default device
 GET  /profile
 POST /send/power
 POST /send/volume_up
@@ -265,7 +322,7 @@ curl -X POST \
 
 ## Home Assistant
 
-IRIS can be discovered by Home Assistant over Zeroconf/mDNS as a local TV bridge. Home Assistant can only show IRIS as a discovered device after the IRIS custom integration has been installed once.
+IRIS can be discovered by Home Assistant over Zeroconf/mDNS as a local IR hub. Home Assistant can only show IRIS as a discovered device after the IRIS custom integration has been installed once.
 
 The Home Assistant integration lives in its own repository:
 
@@ -281,7 +338,7 @@ iris home-assistant setup
 iris daemon start telstar
 ```
 
-`iris home-assistant setup` generates and persists a `device_id`, generates an `api_token` if one is missing, enables discovery, and configures the server to listen on `0.0.0.0:8787`. Protected endpoints still require the token.
+`iris home-assistant setup` generates and persists a bridge ID, generates an `api_token` if one is missing, enables discovery, and configures the server to listen on `0.0.0.0:8787`. The Home Assistant integration configures that bridge once and creates a separate Home Assistant device for every registered IRIS TV or fan. Protected endpoints still require the token.
 
 Install `iris-home-assistant` through HACS as a custom repository of type `Integration`. After Home Assistant restarts, accept the discovered IRIS device and enter the API token printed by `iris home-assistant setup`.
 

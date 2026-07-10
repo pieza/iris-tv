@@ -35,6 +35,16 @@ pub enum IrSignal {
 
 pub trait IrTransmitter: Send + Sync {
     fn send(&self, signal: IrSignal, repeat: u32) -> Result<(), IrisError>;
+
+    fn send_with_frequency(
+        &self,
+        signal: IrSignal,
+        repeat: u32,
+        carrier_frequency: u32,
+    ) -> Result<(), IrisError> {
+        let _ = carrier_frequency;
+        self.send(signal, repeat)
+    }
 }
 
 /// An interrupt-driven source of demodulated IR frames.
@@ -337,30 +347,54 @@ impl RppalTransmitter {
 
 impl IrTransmitter for RppalTransmitter {
     fn send(&self, signal: IrSignal, repeat: u32) -> Result<(), IrisError> {
+        self.send_with_frequency(signal, repeat, self.carrier_frequency)
+    }
+
+    fn send_with_frequency(
+        &self,
+        signal: IrSignal,
+        repeat: u32,
+        carrier_frequency: u32,
+    ) -> Result<(), IrisError> {
         #[cfg(all(feature = "rpi-gpio", target_os = "linux"))]
         {
+            use fs2::FileExt;
+            use std::fs::OpenOptions;
+
+            let lock = OpenOptions::new()
+                .read(true)
+                .write(true)
+                .create(true)
+                .open("/tmp/iris-transmitter.lock")
+                .map_err(IrisError::IoPlain)?;
+            lock.lock_exclusive().map_err(IrisError::IoPlain)?;
             let gpio = rppal::gpio::Gpio::new()
                 .map_err(|_| IrisError::GpioPermissionDenied { pin: self.pin })?;
             let mut pin = gpio
                 .get(self.pin)
                 .map_err(|_| IrisError::GpioUnavailable)?
                 .into_output_low();
-            let pulses = match signal {
-                IrSignal::Nec { address, command } => build_nec_pulses(address, command),
-                IrSignal::Nikai { data, bits } => build_nikai_pulses(data, bits),
-                IrSignal::Raw { pulses, .. } => pulses,
+            let (pulses, frequency) = match signal {
+                IrSignal::Nec { address, command } => {
+                    (build_nec_pulses(address, command), carrier_frequency)
+                }
+                IrSignal::Nikai { data, bits } => {
+                    (build_nikai_pulses(data, bits), carrier_frequency)
+                }
+                IrSignal::Raw { frequency, pulses } => (pulses, frequency),
             };
             for idx in 0..repeat.max(1) {
-                send_pulses(&mut pin, self.carrier_frequency, &pulses);
+                send_pulses(&mut pin, frequency, &pulses);
                 if idx + 1 < repeat.max(1) {
                     thread::sleep(Duration::from_millis(40));
                 }
             }
+            let _ = lock.unlock();
             Ok(())
         }
         #[cfg(not(all(feature = "rpi-gpio", target_os = "linux")))]
         {
-            let _ = (signal, repeat);
+            let _ = (signal, repeat, carrier_frequency);
             Err(IrisError::GpioUnavailable)
         }
     }

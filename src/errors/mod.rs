@@ -8,6 +8,18 @@ pub enum IrisError {
     #[error("no active profile is configured; run `iris start <brand>` first")]
     ActiveProfileMissing,
 
+    #[error("no default device is configured; run `iris device add ...` first")]
+    DefaultDeviceMissing,
+
+    #[error("device `{device}` is not configured")]
+    DeviceNotFound { device: String },
+
+    #[error("device `{device}` already exists")]
+    DeviceAlreadyExists { device: String },
+
+    #[error("IR transmit queue is full; try again shortly")]
+    TransmitQueueFull,
+
     #[error("command `{command}` does not exist in profile `{profile}`")]
     CommandNotFound { command: String, profile: String },
 

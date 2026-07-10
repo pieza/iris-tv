@@ -4,6 +4,13 @@ use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ConfiguredDevice {
+    pub id: String,
+    pub name: String,
+    pub profile: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AppConfig {
     #[serde(default)]
     pub gpio_pin: u8,
@@ -13,6 +20,10 @@ pub struct AppConfig {
     pub carrier_frequency: u32,
     #[serde(default)]
     pub active_profile: Option<String>,
+    #[serde(default)]
+    pub devices: Vec<ConfiguredDevice>,
+    #[serde(default)]
+    pub default_device: Option<String>,
     #[serde(default = "default_repeat")]
     pub default_repeat: u32,
     #[serde(default = "default_log_level")]
@@ -38,6 +49,8 @@ impl Default for AppConfig {
             receiver_gpio_pin: default_receiver_gpio_pin(),
             carrier_frequency: default_carrier_frequency(),
             active_profile: None,
+            devices: Vec::new(),
+            default_device: None,
             default_repeat: default_repeat(),
             log_level: default_log_level(),
             server_host: default_server_host(),
@@ -123,7 +136,10 @@ impl ConfigStore {
         }
 
         let raw = std::fs::read_to_string(&path).map_err(|source| IrisError::io(&path, source))?;
-        toml::from_str(&raw).map_err(|source| IrisError::InvalidConfigToml { path, source })
+        let mut config: AppConfig =
+            toml::from_str(&raw).map_err(|source| IrisError::InvalidConfigToml { path, source })?;
+        config.migrate_legacy_profile();
+        Ok(config)
     }
 
     pub fn save(&self, config: &AppConfig) -> Result<(), IrisError> {
@@ -226,6 +242,118 @@ impl ConfigStore {
         self.save(&config)?;
         Ok(config)
     }
+}
+
+impl AppConfig {
+    /// Makes old single-profile configurations behave as a one-device registry.
+    pub fn migrate_legacy_profile(&mut self) {
+        if self.devices.is_empty()
+            && let Some(profile) = self
+                .active_profile
+                .as_deref()
+                .filter(|profile| !profile.is_empty())
+        {
+            self.devices.push(ConfiguredDevice {
+                id: "default".to_string(),
+                name: self.device_name.clone(),
+                profile: profile.to_string(),
+            });
+            self.default_device = Some("default".to_string());
+        }
+        if self.default_device.is_none() && !self.devices.is_empty() {
+            self.default_device = Some(self.devices[0].id.clone());
+        }
+    }
+
+    pub fn device(&self, id: Option<&str>) -> Result<&ConfiguredDevice, IrisError> {
+        let id = match id {
+            Some(id) => normalize_device_id(id).ok_or(IrisError::DeviceNotFound {
+                device: id.to_string(),
+            })?,
+            None => self
+                .default_device
+                .clone()
+                .ok_or(IrisError::DefaultDeviceMissing)?,
+        };
+        self.devices
+            .iter()
+            .find(|device| device.id == id)
+            .ok_or(IrisError::DeviceNotFound { device: id })
+    }
+
+    pub fn upsert_legacy_default(&mut self, profile: String) {
+        self.active_profile = Some(profile.clone());
+        if let Some(device) = self
+            .devices
+            .iter_mut()
+            .find(|device| device.id == "default")
+        {
+            device.profile = profile;
+        } else {
+            self.devices.push(ConfiguredDevice {
+                id: "default".to_string(),
+                name: self.device_name.clone(),
+                profile,
+            });
+        }
+        self.default_device = Some("default".to_string());
+    }
+
+    pub fn add_device(&mut self, id: &str, name: String, profile: String) -> Result<(), IrisError> {
+        let id = normalize_device_id(id).ok_or(IrisError::InvalidConfigKey {
+            key: "device id".to_string(),
+        })?;
+        if self.devices.iter().any(|device| device.id == id) {
+            return Err(IrisError::DeviceAlreadyExists { device: id });
+        }
+        self.devices.push(ConfiguredDevice {
+            id: id.clone(),
+            name,
+            profile,
+        });
+        if self.default_device.is_none() {
+            self.default_device = Some(id);
+        }
+        Ok(())
+    }
+
+    pub fn remove_device(&mut self, id: &str) -> Result<(), IrisError> {
+        let id = normalize_device_id(id).ok_or(IrisError::DeviceNotFound {
+            device: id.to_string(),
+        })?;
+        let before = self.devices.len();
+        self.devices.retain(|device| device.id != id);
+        if self.devices.len() == before {
+            return Err(IrisError::DeviceNotFound { device: id });
+        }
+        if self.default_device.as_deref() == Some(id.as_str()) {
+            self.default_device = self.devices.first().map(|device| device.id.clone());
+        }
+        Ok(())
+    }
+
+    pub fn use_device(&mut self, id: &str) -> Result<(), IrisError> {
+        let id = normalize_device_id(id).ok_or(IrisError::DeviceNotFound {
+            device: id.to_string(),
+        })?;
+        self.device(Some(&id))?;
+        self.default_device = Some(id);
+        Ok(())
+    }
+}
+
+pub fn normalize_device_id(input: &str) -> Option<String> {
+    let id = input
+        .trim()
+        .to_ascii_lowercase()
+        .chars()
+        .map(|ch| if ch.is_ascii_alphanumeric() { ch } else { '_' })
+        .collect::<String>()
+        .split('_')
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join("_");
+    (!id.is_empty()).then_some(id)
 }
 
 fn generate_api_token() -> String {

@@ -111,3 +111,36 @@ fn config_sets_receiver_pin_and_scan_help_lists_output_options() {
         .stdout(contains("--name <NAME>"))
         .stdout(contains("--path <PATH>"));
 }
+
+#[test]
+fn device_commands_register_and_select_named_profiles() {
+    let config_dir = tempdir().expect("config dir");
+    let profile_dir = tempdir().expect("profile dir");
+    let telstar_dir = profile_dir.path().join("tv").join("telstar");
+    std::fs::create_dir_all(&telstar_dir).expect("profile dirs");
+    std::fs::write(telstar_dir.join("generic.toml"), TELSTAR_PROFILE).expect("profile");
+
+    Command::cargo_bin("iris")
+        .expect("binary")
+        .env("IRIS_CONFIG_DIR", config_dir.path())
+        .env("IRIS_PROFILE_DIR", profile_dir.path())
+        .args([
+            "device",
+            "add",
+            "living-room-tv",
+            "telstar/generic",
+            "--name",
+            "Living Room TV",
+        ])
+        .assert()
+        .success()
+        .stdout(contains("Added device living-room-tv"));
+
+    Command::cargo_bin("iris")
+        .expect("binary")
+        .env("IRIS_CONFIG_DIR", config_dir.path())
+        .args(["device", "list"])
+        .assert()
+        .success()
+        .stdout(contains("living_room_tv"));
+}
