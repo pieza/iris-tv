@@ -1,6 +1,14 @@
 use crate::errors::IrisError;
 use std::collections::VecDeque;
 use std::fmt::Write as _;
+#[cfg(all(feature = "rpi-gpio", target_os = "linux"))]
+use std::fs::File;
+#[cfg(all(feature = "rpi-gpio", target_os = "linux"))]
+use std::io::Write as IoWrite;
+#[cfg(all(feature = "rpi-gpio", target_os = "linux"))]
+use std::os::fd::AsRawFd;
+#[cfg(all(feature = "rpi-gpio", target_os = "linux"))]
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 #[cfg(all(feature = "rpi-gpio", target_os = "linux"))]
 use std::thread;
@@ -191,12 +199,19 @@ pub fn build_nikai_pulses(data: u32, bits: u8) -> Vec<u32> {
 }
 
 pub fn build_nec_pulses(address: u16, command: u16) -> Vec<u32> {
+    build_nec_raw32_pulses(u32::from(address) | (u32::from(command) << 16))
+}
+
+/// Builds a NEC frame from its 32 on-air bits. Bits are emitted least-significant
+/// bit first, with alternating MARK and SPACE durations in microseconds.
+pub fn build_nec_raw32_pulses(data: u32) -> Vec<u32> {
     let mut pulses = Vec::with_capacity(67);
-    pulses.push(9000);
-    pulses.push(4500);
-    append_lsb_bits(&mut pulses, address);
-    append_lsb_bits(&mut pulses, command);
-    pulses.push(560);
+    pulses.extend([9000, 4500]);
+    for bit in 0..32 {
+        pulses.push(562);
+        pulses.push(if data & (1 << bit) == 0 { 562 } else { 1687 });
+    }
+    pulses.push(562);
     pulses
 }
 
@@ -305,17 +320,6 @@ fn timing_matches(actual: u32, expected: u32) -> bool {
     actual.abs_diff(expected) <= tolerance
 }
 
-fn append_lsb_bits(pulses: &mut Vec<u32>, value: u16) {
-    for bit in 0..16 {
-        pulses.push(560);
-        if (value >> bit) & 1 == 1 {
-            pulses.push(1690);
-        } else {
-            pulses.push(560);
-        }
-    }
-}
-
 #[derive(Debug, Clone)]
 pub struct RppalTransmitter {
     #[allow(dead_code)]
@@ -328,10 +332,11 @@ impl RppalTransmitter {
     pub fn new(pin: u8, carrier_frequency: u32) -> Result<Self, IrisError> {
         #[cfg(all(feature = "rpi-gpio", target_os = "linux"))]
         {
-            let _ = rppal::gpio::Gpio::new()
-                .map_err(|_| IrisError::GpioPermissionDenied { pin })?
-                .get(pin)
-                .map_err(|_| IrisError::GpioUnavailable)?;
+            let path = lirc_device_path();
+            File::options()
+                .write(true)
+                .open(&path)
+                .map_err(|_| IrisError::IrTransmitterUnavailable { path })?;
             Ok(Self {
                 pin,
                 carrier_frequency,
@@ -342,6 +347,34 @@ impl RppalTransmitter {
             let _ = (pin, carrier_frequency);
             Err(IrisError::GpioUnavailable)
         }
+    }
+
+    /// Sends an unmodulated-duration MARK with the configured hardware carrier.
+    /// This is intended for checking the carrier with a receiver or oscilloscope.
+    pub fn send_carrier(&self, duration: Duration) -> Result<(), IrisError> {
+        #[cfg(all(feature = "rpi-gpio", target_os = "linux"))]
+        {
+            self.send_lirc_pulses(
+                &[duration.as_micros().min(u128::from(u32::MAX)) as u32],
+                self.carrier_frequency,
+            )
+        }
+        #[cfg(not(all(feature = "rpi-gpio", target_os = "linux")))]
+        {
+            let _ = duration;
+            Err(IrisError::GpioUnavailable)
+        }
+    }
+
+    #[cfg(all(feature = "rpi-gpio", target_os = "linux"))]
+    fn send_lirc_pulses(&self, pulses: &[u32], carrier_frequency: u32) -> Result<(), IrisError> {
+        let path = lirc_device_path();
+        let file = File::options()
+            .write(true)
+            .open(&path)
+            .map_err(|_| IrisError::IrTransmitterUnavailable { path: path.clone() })?;
+        configure_lirc(&file, &path, carrier_frequency)?;
+        write_lirc_pulses(&file, pulses).map_err(IrisError::IoPlain)
     }
 }
 
@@ -368,12 +401,6 @@ impl IrTransmitter for RppalTransmitter {
                 .open("/tmp/iris-transmitter.lock")
                 .map_err(IrisError::IoPlain)?;
             lock.lock_exclusive().map_err(IrisError::IoPlain)?;
-            let gpio = rppal::gpio::Gpio::new()
-                .map_err(|_| IrisError::GpioPermissionDenied { pin: self.pin })?;
-            let mut pin = gpio
-                .get(self.pin)
-                .map_err(|_| IrisError::GpioUnavailable)?
-                .into_output_low();
             let (pulses, frequency) = match signal {
                 IrSignal::Nec { address, command } => {
                     (build_nec_pulses(address, command), carrier_frequency)
@@ -384,7 +411,7 @@ impl IrTransmitter for RppalTransmitter {
                 IrSignal::Raw { frequency, pulses } => (pulses, frequency),
             };
             for idx in 0..repeat.max(1) {
-                send_pulses(&mut pin, frequency, &pulses);
+                self.send_lirc_pulses(&pulses, frequency)?;
                 if idx + 1 < repeat.max(1) {
                     thread::sleep(Duration::from_millis(40));
                 }
@@ -399,6 +426,69 @@ impl IrTransmitter for RppalTransmitter {
         }
     }
 }
+
+#[cfg(all(feature = "rpi-gpio", target_os = "linux"))]
+fn lirc_device_path() -> PathBuf {
+    std::env::var_os("IRIS_LIRC_DEVICE")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from("/dev/lirc0"))
+}
+
+#[cfg(all(feature = "rpi-gpio", target_os = "linux"))]
+fn configure_lirc(file: &File, path: &PathBuf, carrier_frequency: u32) -> Result<(), IrisError> {
+    let mut features = 0_u32;
+    ioctl_u32(file, LIRC_GET_FEATURES, &mut features).map_err(IrisError::IoPlain)?;
+    if features & LIRC_CAN_SEND_PULSE == 0 {
+        return Err(IrisError::IrTransmitterUnsupported { path: path.clone() });
+    }
+
+    let mut mode = LIRC_MODE_PULSE;
+    ioctl_u32(file, LIRC_SET_SEND_MODE, &mut mode).map_err(IrisError::IoPlain)?;
+    let mut frequency = carrier_frequency;
+    ioctl_u32(file, LIRC_SET_SEND_CARRIER, &mut frequency).map_err(IrisError::IoPlain)?;
+    let mut duty_cycle = 50_u32;
+    ioctl_u32(file, LIRC_SET_SEND_DUTY_CYCLE, &mut duty_cycle).map_err(IrisError::IoPlain)
+}
+
+#[cfg(all(feature = "rpi-gpio", target_os = "linux"))]
+fn write_lirc_pulses(file: &File, pulses: &[u32]) -> std::io::Result<()> {
+    let end = if pulses.len().is_multiple_of(2) {
+        pulses.len().saturating_sub(1)
+    } else {
+        pulses.len()
+    };
+    let mut bytes = Vec::with_capacity(end * std::mem::size_of::<u32>());
+    for pulse in &pulses[..end] {
+        bytes.extend_from_slice(&pulse.to_ne_bytes());
+    }
+    let mut file = file;
+    file.write_all(&bytes)
+}
+
+#[cfg(all(feature = "rpi-gpio", target_os = "linux"))]
+fn ioctl_u32(file: &File, request: libc::c_ulong, value: &mut u32) -> std::io::Result<()> {
+    // SAFETY: `file` owns a valid descriptor, the request expects a pointer to a
+    // writable u32, and `value` remains alive for the duration of the syscall.
+    let result = unsafe { libc::ioctl(file.as_raw_fd(), request, value) };
+    if result == -1 {
+        Err(std::io::Error::last_os_error())
+    } else {
+        Ok(())
+    }
+}
+
+#[cfg(all(feature = "rpi-gpio", target_os = "linux"))]
+const LIRC_CAN_SEND_PULSE: u32 = 0x0000_0002;
+#[cfg(all(feature = "rpi-gpio", target_os = "linux"))]
+const LIRC_MODE_PULSE: u32 = 0x0000_0002;
+#[cfg(all(feature = "rpi-gpio", target_os = "linux"))]
+const LIRC_GET_FEATURES: libc::c_ulong = 0x8004_6900;
+#[cfg(all(feature = "rpi-gpio", target_os = "linux"))]
+const LIRC_SET_SEND_MODE: libc::c_ulong = 0x4004_6911;
+#[cfg(all(feature = "rpi-gpio", target_os = "linux"))]
+const LIRC_SET_SEND_CARRIER: libc::c_ulong = 0x4004_6913;
+#[cfg(all(feature = "rpi-gpio", target_os = "linux"))]
+const LIRC_SET_SEND_DUTY_CYCLE: libc::c_ulong = 0x4004_6915;
 
 #[cfg(all(feature = "rpi-gpio", target_os = "linux"))]
 const FRAME_IDLE_GAP: Duration = Duration::from_millis(20);
@@ -514,26 +604,4 @@ impl IrReceiver for RppalReceiver {
             Err(IrisError::GpioUnavailable)
         }
     }
-}
-
-#[cfg(all(feature = "rpi-gpio", target_os = "linux"))]
-fn send_pulses(pin: &mut rppal::gpio::OutputPin, carrier_frequency: u32, pulses: &[u32]) {
-    let period = Duration::from_micros(1_000_000 / carrier_frequency.max(1) as u64);
-    let half_period = period / 2;
-    for (idx, pulse) in pulses.iter().enumerate() {
-        let duration = Duration::from_micros(u64::from(*pulse));
-        if idx % 2 == 0 {
-            let start = std::time::Instant::now();
-            while start.elapsed() < duration {
-                pin.set_high();
-                thread::sleep(half_period);
-                pin.set_low();
-                thread::sleep(half_period);
-            }
-        } else {
-            pin.set_low();
-            thread::sleep(duration);
-        }
-    }
-    pin.set_low();
 }

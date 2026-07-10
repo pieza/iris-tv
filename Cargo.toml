@@ -1,6 +1,6 @@
 [package]
 name = "iris"
-version = "1.6.3"
+version = "1.6.4"
 edition = "2024"
 description = "Rust CLI for controlling infrared TVs from a Raspberry Pi"
 license = "MIT"
@@ -28,6 +28,7 @@ uuid = { version = "1.18", features = ["v4"] }
 fs2 = "0.4"
 
 [target.'cfg(target_os = "linux")'.dependencies]
+libc = "0.2"
 rppal = { version = "0.22", optional = true }
 
 [dev-dependencies]

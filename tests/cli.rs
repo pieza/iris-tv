@@ -113,6 +113,18 @@ fn config_sets_receiver_pin_and_scan_help_lists_output_options() {
 }
 
 #[test]
+fn debug_help_lists_transmit_diagnostics() {
+    Command::cargo_bin("iris")
+        .expect("binary")
+        .args(["debug", "--help"])
+        .assert()
+        .success()
+        .stdout(contains("send-nec-raw32"))
+        .stdout(contains("carrier"))
+        .stdout(contains("send-and-capture"));
+}
+
+#[test]
 fn device_commands_register_and_select_named_profiles() {
     let config_dir = tempdir().expect("config dir");
     let profile_dir = tempdir().expect("profile dir");

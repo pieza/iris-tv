@@ -31,6 +31,22 @@ IR LED cathode --------------------- NPN collector
 
 Check your LED current rating and resistor values before powering the circuit.
 
+### Reliable IR transmission
+
+IRIS sends through Linux's kernel IR transmitter interface instead of trying to
+create a 38 kHz carrier with userspace sleeps. On a Raspberry Pi 3 using BCM
+GPIO 18, enable the `gpio-ir-tx` overlay and reboot before using `iris send`:
+
+```bash
+echo 'dtoverlay=gpio-ir-tx,gpio_pin=18' | sudo tee -a /boot/firmware/config.txt
+sudo reboot
+```
+
+The transmitter is exposed as `/dev/lirc0` by default. Set `IRIS_LIRC_DEVICE`
+when your system assigned a different LIRC device. The kernel generates a 38
+kHz, 50% duty-cycle carrier for MARK periods and keeps the LED off for SPACE
+periods.
+
 For `iris scan`, wire a standard active-low demodulated receiver as follows:
 
 ```text
@@ -52,7 +68,7 @@ curl -fsSL https://raw.githubusercontent.com/pieza/iris-tv/main/scripts/install.
 Install a specific version:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/pieza/iris-tv/main/scripts/install.sh | bash -s -- V1.6.3
+curl -fsSL https://raw.githubusercontent.com/pieza/iris-tv/main/scripts/install.sh | bash -s -- V1.6.4
 ```
 
 The installer downloads the release asset, installs `iris` to `/usr/local/bin/iris`, and installs editable profiles to `/usr/local/share/iris/profiles`.
@@ -111,6 +127,21 @@ Enable debug logs with:
 
 ```bash
 RUST_LOG=debug iris send power
+```
+
+## Transmitter Diagnostics
+
+On the Raspberry Pi, these commands help compare IRIS with the original remote:
+
+```bash
+# Send the 32 NEC on-air bits LSB-first with the required NEC timings.
+iris debug send-nec-raw32 0x1AE5807F
+
+# Emit only a 38 kHz carrier for two seconds.
+iris debug carrier --duration 2
+
+# Send a profile command and print what receiver_gpio_pin captures.
+iris debug send-and-capture power
 ```
 
 ## Basic Use

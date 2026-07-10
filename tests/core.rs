@@ -3,7 +3,7 @@ use iris::discovery;
 use iris::errors::IrisError;
 use iris::ir::{
     DryRunTransmitter, IrSignal, IrTransmitter, MockTransmitter, build_nec_pulses,
-    build_nikai_pulses,
+    build_nec_raw32_pulses, build_nikai_pulses,
 };
 use iris::profiles::{Profile, ProfileId, ProfileStore};
 use tempfile::tempdir;
@@ -345,9 +345,24 @@ fn nec_signal_builder_uses_expected_header_and_bit_timings() {
     let pulses = build_nec_pulses(0x0001, 0x0000);
 
     assert_eq!(&pulses[0..2], &[9000, 4500]);
-    assert_eq!(&pulses[2..4], &[560, 1690]);
-    assert_eq!(&pulses[4..6], &[560, 560]);
-    assert_eq!(pulses.last(), Some(&560));
+    assert_eq!(&pulses[2..4], &[562, 1687]);
+    assert_eq!(&pulses[4..6], &[562, 562]);
+    assert_eq!(pulses.last(), Some(&562));
+    assert_eq!(pulses.len(), 67);
+}
+
+#[test]
+fn raw32_nec_builder_emits_all_bits_lsb_first() {
+    let pulses = build_nec_raw32_pulses(0x1AE5_807F);
+
+    assert_eq!(&pulses[0..2], &[9000, 4500]);
+    // 0x7F is sent first and its least-significant bit is one.
+    assert_eq!(&pulses[2..4], &[562, 1687]);
+    // The next bit is also one.
+    assert_eq!(&pulses[4..6], &[562, 1687]);
+    // The eighth bit of 0x7F is zero.
+    assert_eq!(&pulses[16..18], &[562, 562]);
+    assert_eq!(pulses.last(), Some(&562));
     assert_eq!(pulses.len(), 67);
 }
 

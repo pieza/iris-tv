@@ -52,6 +52,17 @@ pub enum IrisError {
     #[error("permission denied while accessing GPIO pin {pin}; try running with GPIO permissions")]
     GpioPermissionDenied { pin: u8 },
 
+    #[error(
+        "no Linux IR transmitter is available at `{path}`; configure gpio-ir-tx for the IR LED and reboot"
+    )]
+    IrTransmitterUnavailable { path: PathBuf },
+
+    #[error("Linux IR transmitter at `{path}` does not support pulse transmission")]
+    IrTransmitterUnsupported { path: PathBuf },
+
+    #[error("timed out waiting for an IR frame from the receiver")]
+    CaptureTimedOut,
+
     #[error("daemon is already running with PID {pid}")]
     DaemonAlreadyRunning { pid: u32 },
 

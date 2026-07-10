@@ -515,7 +515,7 @@ dependencies = [
 
 [[package]]
 name = "iris"
-version = "1.6.3"
+version = "1.6.4"
 dependencies = [
  "assert_cmd",
  "axum",
@@ -524,6 +524,7 @@ dependencies = [
  "directories",
  "fs2",
  "hex",
+ "libc",
  "mdns-sd",
  "predicates",
  "rppal",
