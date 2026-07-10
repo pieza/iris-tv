@@ -7,7 +7,8 @@ IRIS is split into small modules so GPIO access, profile parsing, command handli
 - `cli`: Clap command definitions and command orchestration.
 - `config`: User config loading and persistence for `~/.config/iris/config.toml`.
 - `profiles`: TOML profile parsing, brand/model resolution, and command lookup.
-- `ir`: Protocol-neutral IR signal types plus dry-run, mock, and Raspberry Pi GPIO transmitters.
+- `ir`: Protocol-neutral IR signal types plus dry-run, mock, and Raspberry Pi GPIO transmitters and receivers.
+- `scan`: Interactive receiver-learning session, terminal input, session logging, and generated profile serialization.
 - `server`: Local HTTP API for integration with automation systems.
 - `daemon`: PID-file based background server management.
 - `errors`: Typed user-facing error messages.

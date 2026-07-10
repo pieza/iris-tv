@@ -86,3 +86,28 @@ fn home_assistant_setup_command_persists_network_discovery_config() {
     assert!(config.contains("device_id = "));
     assert!(config.contains("api_token = "));
 }
+
+#[test]
+fn config_sets_receiver_pin_and_scan_help_lists_output_options() {
+    let config_dir = tempdir().expect("config dir");
+
+    Command::cargo_bin("iris")
+        .expect("binary")
+        .env("IRIS_CONFIG_DIR", config_dir.path())
+        .args(["config", "set", "receiver_gpio_pin", "24"])
+        .assert()
+        .success()
+        .stdout(contains("Set receiver_gpio_pin = 24"));
+
+    let config = std::fs::read_to_string(config_dir.path().join("config.toml"))
+        .expect("config file written");
+    assert!(config.contains("receiver_gpio_pin = 24"));
+
+    Command::cargo_bin("iris")
+        .expect("binary")
+        .args(["scan", "--help"])
+        .assert()
+        .success()
+        .stdout(contains("--name <NAME>"))
+        .stdout(contains("--path <PATH>"));
+}

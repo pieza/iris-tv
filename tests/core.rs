@@ -111,6 +111,7 @@ fn config_store_persists_active_profile() {
 
     assert_eq!(loaded.active_profile.as_deref(), Some("telstar/generic"));
     assert_eq!(loaded.gpio_pin, 23);
+    assert_eq!(loaded.receiver_gpio_pin, 23);
 }
 
 #[test]
