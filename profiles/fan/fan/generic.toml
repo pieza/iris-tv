@@ -4,6 +4,11 @@ device_type = "fan"
 carrier_frequency = 38000
 protocol = "nec"
 
+[home_assistant.fan]
+power_on = "power"
+power_off = "power"
+oscillate = "toggle_rotate"
+
 [commands.power]
 type = "nec"
 address = "0x7F80"

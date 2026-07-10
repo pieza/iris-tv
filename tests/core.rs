@@ -145,6 +145,14 @@ fn bundled_generic_fan_profile_uses_captured_nec_commands() {
 
     assert_eq!(profile.device_type, "fan");
     assert_eq!(
+        profile
+            .home_assistant
+            .fan
+            .as_ref()
+            .and_then(|fan| fan.oscillate.as_deref()),
+        Some("toggle_rotate")
+    );
+    assert_eq!(
         profile.signal_for("mute").expect("mute signal"),
         IrSignal::Nec {
             address: 0x7F80,
