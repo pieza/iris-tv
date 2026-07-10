@@ -6,7 +6,9 @@ use std::collections::BTreeMap;
 use std::fs::{File, OpenOptions};
 use std::io::{BufRead, Write};
 use std::path::{Path, PathBuf};
-use std::time::Duration;
+use std::time::{Duration, Instant};
+
+const REPEAT_DRAIN_WINDOW: Duration = Duration::from_millis(250);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ScanKey {
@@ -242,10 +244,12 @@ pub fn run_interactive_session<R: IrReceiver, I: ScanInput, W: Write>(
                         "Saved as `{command}`. Listening for the next frame."
                     )?;
                     output.flush()?;
+                    discard_repeat_frames(receiver)?;
                 }
                 PromptResult::Skip => {
                     writeln!(output, "Skipped frame. Listening for the next frame.")?;
                     output.flush()?;
+                    discard_repeat_frames(receiver)?;
                 }
                 PromptResult::Finish => return session.finish(),
             }
@@ -254,6 +258,26 @@ pub fn run_interactive_session<R: IrReceiver, I: ScanInput, W: Write>(
 
         if let Some(ScanKey::Escape | ScanKey::CtrlC) = input.poll_key(Duration::from_millis(1))? {
             return session.finish();
+        }
+    }
+}
+
+/// Discards frames queued by the same remote-button press while the user was
+/// naming or skipping the first capture. Many remotes transmit a short burst
+/// for one press, and the GPIO interrupt queue can retain those repeats.
+fn discard_repeat_frames<R: IrReceiver>(receiver: &mut R) -> Result<(), IrisError> {
+    let deadline = Instant::now() + REPEAT_DRAIN_WINDOW;
+    loop {
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            return Ok(());
+        }
+
+        if receiver
+            .receive_frame(remaining.min(Duration::from_millis(50)))?
+            .is_none()
+        {
+            return Ok(());
         }
     }
 }

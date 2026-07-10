@@ -52,7 +52,7 @@ curl -fsSL https://raw.githubusercontent.com/pieza/iris-tv/main/scripts/install.
 Install a specific version:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/pieza/iris-tv/main/scripts/install.sh | bash -s -- V1.6.1
+curl -fsSL https://raw.githubusercontent.com/pieza/iris-tv/main/scripts/install.sh | bash -s -- V1.6.2
 ```
 
 The installer downloads the release asset, installs `iris` to `/usr/local/bin/iris`, and installs editable profiles to `/usr/local/share/iris/profiles`.
@@ -248,7 +248,7 @@ iris scan --name "Living Room TV" --path ./learned-remotes
 
 If `--name` is omitted, IRIS prompts before opening the receiver. If `--path` is omitted, it writes to the current directory and creates missing directories. Names are normalized to snake case, so this example creates `living_room_tv.txt` and `living_room_tv.toml`.
 
-The session shows `press Esc to finish`. Aim the remote at the receiver and press one button at a time. For every capture IRIS shows a recognized NEC/Nikai result when possible, along with the raw mark/space durations. Enter a command name to accept it, or press Esc at the command prompt to skip that frame. Press Esc while waiting for the next button (or Ctrl+C) to finish and write the TOML profile.
+The session shows `press Esc to finish`. Aim the remote at the receiver and press one button at a time. For every capture IRIS shows a recognized NEC/Nikai result when possible, along with the raw mark/space durations. Enter a command name to accept it, or press Esc at the command prompt to skip that frame. IRIS discards repeat frames queued by that same button press before listening again. Press Esc while waiting for the next button (or Ctrl+C) to finish and write the TOML profile.
 
 Accepted captures are appended immediately to the readable `.txt` session log using the entered label. On finish, the `.toml` file is generated as a usable `brand = "living_room_tv"`, `model = "learned"` profile; recognized codes use NEC or Nikai commands and all other captures use raw timings. IRIS refuses to start if either output file already exists, so it never overwrites a prior learning session.
 

@@ -124,7 +124,7 @@ fn interactive_scan_accepts_skips_and_finishes_with_escape() {
     let root = tempdir().expect("temp root");
     let accepted = CapturedFrame::from_pulses(build_nec_pulses(1, 2), 38_000);
     let skipped = CapturedFrame::from_pulses(vec![200, 300, 400], 38_000);
-    let mut receiver = MockReceiver::new([Some(accepted), Some(skipped), None]);
+    let mut receiver = MockReceiver::new([Some(accepted), None, Some(skipped), None]);
     let mut keys = characters("Power Button");
     keys.push(ScanKey::Enter);
     keys.push(ScanKey::Escape);
@@ -143,6 +143,32 @@ fn interactive_scan_accepts_skips_and_finishes_with_escape() {
         String::from_utf8(output)
             .expect("output")
             .contains("Skipped frame")
+    );
+}
+
+#[test]
+fn interactive_scan_discards_repeat_frames_after_accepting_a_command() {
+    let root = tempdir().expect("temp root");
+    let frame = CapturedFrame::from_pulses(build_nec_pulses(1, 2), 38_000);
+    let repeat = CapturedFrame::from_pulses(build_nec_pulses(1, 2), 38_000);
+    let mut receiver = MockReceiver::new([Some(frame), Some(repeat), None]);
+    let mut keys = characters("power");
+    keys.push(ScanKey::Enter);
+    keys.push(ScanKey::Escape);
+    let mut input = ScriptedInput::new(keys);
+    let mut output = Vec::new();
+    let mut session = ScanSession::new("Test TV", root.path(), 38_000).expect("session");
+
+    run_interactive_session(&mut receiver, &mut input, &mut output, &mut session)
+        .expect("interactive scan");
+
+    assert_eq!(session.accepted_count(), 1);
+    assert_eq!(
+        String::from_utf8(output)
+            .expect("output")
+            .matches("Command name")
+            .count(),
+        1
     );
 }
 
