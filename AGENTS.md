@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-IRIS is a Rust CLI and local HTTP server for controlling infrared TVs from a Raspberry Pi. It loads editable TOML remote profiles from `profiles/tv/<brand>/<model>.toml` and sends IR commands through a GPIO-connected infrared LED.
+IRIS is a Rust CLI and local HTTP server for controlling infrared devices from a Raspberry Pi. It loads editable TOML remote profiles from `profiles/<device_type>/<brand>/<model>.toml` and sends IR commands through a GPIO-connected infrared LED.
 
 The source should stay profile-data driven. Do not hardcode TV remote codes in Rust when a TOML profile can express them.
 
@@ -41,7 +41,7 @@ cargo run -- send power --dry-run
 - Keep public CLI behavior, error text, and README examples aligned.
 - Prefer small, focused modules that follow the existing architecture.
 - Keep new IR protocols behind `IrSignal`/transmitter abstractions.
-- Add new TV support as TOML profiles under `profiles/tv/<brand>/<model>.toml`.
+- Add device support as TOML profiles under `profiles/<device_type>/<brand>/<model>.toml`.
 - Keep tests deterministic; use temp directories and mock or dry-run transmitters instead of real GPIO.
 - Do not run commands that require real Raspberry Pi GPIO hardware unless the user explicitly asks.
 

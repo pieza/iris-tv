@@ -1,8 +1,10 @@
 use crate::errors::IrisError;
 use crate::ir::IrSignal;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
+
+const PROFILE_TYPES: [&str; 2] = ["tv", "fan"];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProfileId {
@@ -41,10 +43,12 @@ impl ProfileId {
         format!("{}/{}", self.brand, self.model)
     }
 
-    pub fn relative_path(&self) -> PathBuf {
-        PathBuf::from("tv")
-            .join(&self.brand)
-            .join(format!("{}.toml", self.model))
+    fn relative_paths(&self) -> impl Iterator<Item = PathBuf> + '_ {
+        PROFILE_TYPES.into_iter().map(|device_type| {
+            PathBuf::from(device_type)
+                .join(&self.brand)
+                .join(format!("{}.toml", self.model))
+        })
     }
 }
 
@@ -181,54 +185,62 @@ impl ProfileStore {
     }
 
     fn load_id(&self, id: &ProfileId) -> Result<Profile, IrisError> {
-        let path = self.root.join(id.relative_path());
-        if !path.exists() {
-            return Err(IrisError::ProfileNotFound { profile: id.key() });
-        }
+        let path = id
+            .relative_paths()
+            .map(|path| self.root.join(path))
+            .find(|path| path.exists())
+            .ok_or_else(|| IrisError::ProfileNotFound { profile: id.key() })?;
         let raw = std::fs::read_to_string(&path).map_err(|source| IrisError::io(&path, source))?;
         toml::from_str(&raw).map_err(|source| IrisError::InvalidProfileToml { path, source })
     }
 
     pub fn list_brands(&self) -> Result<Vec<String>, IrisError> {
-        let tv_root = self.root.join("tv");
-        if !tv_root.exists() {
-            return Ok(Vec::new());
-        }
-        let mut brands = Vec::new();
-        for entry in
-            std::fs::read_dir(&tv_root).map_err(|source| IrisError::io(&tv_root, source))?
-        {
-            let entry = entry.map_err(IrisError::IoPlain)?;
-            if entry.path().is_dir()
-                && let Some(name) = entry.file_name().to_str()
+        let mut brands = BTreeSet::new();
+        for device_type in PROFILE_TYPES {
+            let type_root = self.root.join(device_type);
+            if !type_root.exists() {
+                continue;
+            }
+            for entry in
+                std::fs::read_dir(&type_root).map_err(|source| IrisError::io(&type_root, source))?
             {
-                brands.push(name.to_string());
+                let entry = entry.map_err(IrisError::IoPlain)?;
+                if entry.path().is_dir()
+                    && let Some(name) = entry.file_name().to_str()
+                {
+                    brands.insert(name.to_string());
+                }
             }
         }
-        brands.sort();
-        Ok(brands)
+        Ok(brands.into_iter().collect())
     }
 
     pub fn list_models(&self, brand: &str) -> Result<Vec<String>, IrisError> {
-        let brand_root = self.root.join("tv").join(slug(brand));
-        if !brand_root.exists() {
+        let mut models = BTreeSet::new();
+        let mut brand_found = false;
+        for device_type in PROFILE_TYPES {
+            let brand_root = self.root.join(device_type).join(slug(brand));
+            if !brand_root.exists() {
+                continue;
+            }
+            brand_found = true;
+            for entry in std::fs::read_dir(&brand_root)
+                .map_err(|source| IrisError::io(&brand_root, source))?
+            {
+                let entry = entry.map_err(IrisError::IoPlain)?;
+                let path = entry.path();
+                if path.extension().and_then(|ext| ext.to_str()) == Some("toml")
+                    && let Some(stem) = path.file_stem().and_then(|stem| stem.to_str())
+                {
+                    models.insert(stem.to_string());
+                }
+            }
+        }
+        if !brand_found {
             return Err(IrisError::ProfileNotFound {
                 profile: brand.to_string(),
             });
         }
-        let mut models = Vec::new();
-        for entry in
-            std::fs::read_dir(&brand_root).map_err(|source| IrisError::io(&brand_root, source))?
-        {
-            let entry = entry.map_err(IrisError::IoPlain)?;
-            let path = entry.path();
-            if path.extension().and_then(|ext| ext.to_str()) == Some("toml")
-                && let Some(stem) = path.file_stem().and_then(|stem| stem.to_str())
-            {
-                models.push(stem.to_string());
-            }
-        }
-        models.sort();
-        Ok(models)
+        Ok(models.into_iter().collect())
     }
 }

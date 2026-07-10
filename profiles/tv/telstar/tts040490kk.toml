@@ -2,33 +2,7 @@ brand = "telstar"
 model = "tts040490kk"
 device_type = "tv"
 carrier_frequency = 38000
-protocol = "nikai"
+protocol = "nec"
 
 [commands]
-power = { type = "nikai", data = "0x0D5F2A" }
-volume_up = { type = "nikai", data = "0x0D0F2F" }
-volume_down = { type = "nikai", data = "0x0D1F2E" }
-mute = { type = "nikai", data = "0x0C0F3F" }
-input = { type = "nikai", data = "0x05CFA3" }
-channel_up = { type = "nikai", data = "0x0D2F2D" }
-channel_down = { type = "nikai", data = "0x0D3F2C" }
-menu = { type = "nikai", data = "0x013FEC" }
-q_menu = { type = "nikai", data = "0x030FCF" }
-up = { type = "nikai", data = "0x0A6F59" }
-down = { type = "nikai", data = "0x0A7F58" }
-left = { type = "nikai", data = "0x0A9F56" }
-right = { type = "nikai", data = "0x0A8F57" }
-ok = { type = "nikai", data = "0x00BFF4" }
-back = { type = "nikai", data = "0x0D8F27" }
-exit = { type = "nikai", data = "0x0D8F27" }
-guide = { type = "nikai", data = "0x0E5F1A" }
-home = { type = "nikai", data = "0x0F7F08" }
-netflix = { type = "nikai", data = "0x010FEF" }
-prime_video = { type = "nikai", data = "0x03EFC1" }
-youtube = { type = "nikai", data = "0x01DFE2" }
-red = { type = "nikai", data = "0x0FFF00" }
-green = { type = "nikai", data = "0x017FE8" }
-yellow = { type = "nikai", data = "0x01BFE4" }
-blue = { type = "nikai", data = "0x027FD8" }
-info = { type = "nikai", data = "0x0C3F3C" }
-list = { type = "nikai", data = "0x09EF61" }
+power = { type = "nec", address = "0xBF40", command = "0xED12" }

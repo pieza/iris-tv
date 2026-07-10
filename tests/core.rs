@@ -58,22 +58,11 @@ fn resolves_brand_model_to_profile_id_and_file_path() {
     assert_eq!(id.brand, "telstar");
     assert_eq!(id.model, "generic");
     assert_eq!(id.key(), "telstar/generic");
-    assert_eq!(
-        id.relative_path().to_string_lossy().replace('\\', "/"),
-        "tv/telstar/generic.toml"
-    );
 
     let model_id = ProfileId::from_brand_model("Telstar", Some("TTC04"));
     assert_eq!(model_id.brand, "telstar");
     assert_eq!(model_id.model, "ttc04");
     assert_eq!(model_id.key(), "telstar/ttc04");
-    assert_eq!(
-        model_id
-            .relative_path()
-            .to_string_lossy()
-            .replace('\\', "/"),
-        "tv/telstar/ttc04.toml"
-    );
 }
 
 #[test]
@@ -82,10 +71,24 @@ fn profile_store_lists_brands_and_models() {
     let profile_path = root.path().join("tv").join("telstar");
     std::fs::create_dir_all(&profile_path).expect("profile dir");
     std::fs::write(profile_path.join("generic.toml"), TELSTAR_PROFILE).expect("profile file");
+    let fan_path = root.path().join("fan").join("fan");
+    std::fs::create_dir_all(&fan_path).expect("fan profile dir");
+    std::fs::write(
+        fan_path.join("generic.toml"),
+        r#"
+brand = "fan"
+model = "generic"
+device_type = "fan"
+
+[commands]
+power = { type = "nec", address = "0xBF40", command = "0xED12" }
+"#,
+    )
+    .expect("fan profile file");
 
     let store = ProfileStore::new(root.path());
 
-    assert_eq!(store.list_brands().expect("brands"), vec!["telstar"]);
+    assert_eq!(store.list_brands().expect("brands"), vec!["fan", "telstar"]);
     assert_eq!(
         store.list_models("telstar").expect("models"),
         vec!["generic".to_string()]
@@ -93,6 +96,85 @@ fn profile_store_lists_brands_and_models() {
     assert_eq!(
         store.load_brand_model("telstar", None).expect("load").model,
         "generic"
+    );
+    assert_eq!(
+        store.list_models("fan").expect("fan models"),
+        vec!["generic".to_string()]
+    );
+
+    std::fs::create_dir_all(root.path().join("tv").join("empty")).expect("empty profile dir");
+    assert_eq!(
+        store.list_models("empty").expect("empty models"),
+        Vec::<String>::new()
+    );
+}
+
+#[test]
+fn profile_store_loads_fan_profiles_from_fan_directory() {
+    let root = tempdir().expect("temp root");
+    let profile_path = root.path().join("fan").join("generic_fan");
+    std::fs::create_dir_all(&profile_path).expect("profile dir");
+    std::fs::write(
+        profile_path.join("generic.toml"),
+        r#"
+brand = "generic_fan"
+model = "generic"
+device_type = "fan"
+
+[commands]
+power = { type = "nec", address = "0xBF40", command = "0xED12" }
+"#,
+    )
+    .expect("profile file");
+
+    let store = ProfileStore::new(root.path());
+    let profile = store
+        .load_brand_model("generic_fan", None)
+        .expect("fan profile");
+
+    assert_eq!(profile.device_type, "fan");
+}
+
+#[test]
+fn bundled_generic_fan_profile_uses_captured_nec_commands() {
+    let store =
+        ProfileStore::new(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("profiles"));
+    let profile = store
+        .load_brand_model("fan", None)
+        .expect("bundled fan profile");
+
+    assert_eq!(profile.device_type, "fan");
+    assert_eq!(
+        profile.signal_for("power").expect("power signal"),
+        IrSignal::Nec {
+            address: 0xBF40,
+            command: 0xED12,
+        }
+    );
+    assert_eq!(
+        profile.signal_for("volume_up").expect("volume up signal"),
+        IrSignal::Nec {
+            address: 0xBF40,
+            command: 0xE51A,
+        }
+    );
+}
+
+#[test]
+fn bundled_telstar_tts040490kk_profile_uses_captured_nec_power() {
+    let store =
+        ProfileStore::new(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("profiles"));
+    let profile = store
+        .load_brand_model("telstar", Some("tts040490kk"))
+        .expect("bundled Telstar profile");
+
+    assert_eq!(profile.commands.len(), 1);
+    assert_eq!(
+        profile.signal_for("power").expect("power signal"),
+        IrSignal::Nec {
+            address: 0xBF40,
+            command: 0xED12,
+        }
     );
 }
 

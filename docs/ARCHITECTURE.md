@@ -21,7 +21,7 @@ IRIS is split into small modules so GPIO access, profile parsing, command handli
 
 ## Extension Points
 
-Add a new TV by adding a TOML profile under `profiles/tv/<brand>/<model>.toml`.
+Add a device profile under `profiles/<device_type>/<brand>/<model>.toml`.
 
 Add another IR protocol by extending `CommandDefinition`, converting it into a new `IrSignal` variant, and adding the encoder/transmitter support in `ir`.
 

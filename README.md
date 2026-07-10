@@ -6,7 +6,7 @@
 
 IRIS is a Rust CLI for turning an infrared-controlled TV into a command-driven TV through a Raspberry Pi 3. It loads editable TOML remote profiles and sends IR commands through a GPIO-connected infrared LED.
 
-The first supported profile is Telstar, but profiles are data files under `profiles/tv/<brand>/<model>.toml`; the Rust source does not hardcode remote codes.
+The first supported profile is Telstar, but profiles are data files under `profiles/<device_type>/<brand>/<model>.toml`; the Rust source does not hardcode remote codes.
 
 ## Hardware
 
@@ -52,7 +52,7 @@ curl -fsSL https://raw.githubusercontent.com/pieza/iris-tv/main/scripts/install.
 Install a specific version:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/pieza/iris-tv/main/scripts/install.sh | bash -s -- V1.6.0
+curl -fsSL https://raw.githubusercontent.com/pieza/iris-tv/main/scripts/install.sh | bash -s -- V1.6.1
 ```
 
 The installer downloads the release asset, installs `iris` to `/usr/local/bin/iris`, and installs editable profiles to `/usr/local/share/iris/profiles`.
@@ -205,7 +205,7 @@ Existing single-profile configurations are migrated automatically to a `default`
 Profiles live under:
 
 ```text
-profiles/tv/<brand>/<model>.toml
+profiles/<device_type>/<brand>/<model>.toml
 ```
 
 Example:
@@ -223,10 +223,11 @@ volume_up = { type = "nec", address = "0x00FF", command = "0x629D" }
 raw_demo = { type = "raw", frequency = 38000, pulses = [9000, 4500, 560, 560] }
 ```
 
-To add a new TV, create a new TOML file such as:
+To add a TV or fan, create its TOML file in the matching device-type directory:
 
 ```text
 profiles/tv/telstar/ttc04.toml
+profiles/fan/fan/generic.toml
 ```
 
 Then load it:

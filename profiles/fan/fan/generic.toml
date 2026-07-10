@@ -1,0 +1,9 @@
+brand = "fan"
+model = "generic"
+device_type = "fan"
+carrier_frequency = 38000
+protocol = "nec"
+
+[commands]
+power = { type = "nec", address = "0xBF40", command = "0xED12" }
+volume_up = { type = "nec", address = "0xBF40", command = "0xE51A" }
