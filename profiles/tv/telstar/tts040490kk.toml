@@ -9,6 +9,66 @@ type = "nec"
 address = "0xBF40"
 command = "0xED12"
 
+[commands.back]
+type = "nec"
+address = "0xBF40"
+command = "0x26D9"
+
+[commands.channel_down]
+type = "nec"
+address = "0xBF40"
+command = "0xE01F"
+
+[commands.channel_up]
+type = "nec"
+address = "0xBF40"
+command = "0xE41B"
+
+[commands.down]
+type = "nec"
+address = "0xBF40"
+command = "0x7C83"
+
+[commands.enter]
+type = "nec"
+address = "0xBF40"
+command = "0x7689"
+
+[commands.input]
+type = "nec"
+address = "0xBF40"
+command = "0xF00F"
+
+[commands.left]
+type = "nec"
+address = "0xBF40"
+command = "0xE21D"
+
+[commands.menu]
+type = "nec"
+address = "0xBF40"
+command = "0x7F80"
+
+[commands.mute]
+type = "nec"
+address = "0xBF40"
+command = "0xEF10"
+
+[commands.netflix]
+type = "nec"
+address = "0xBF40"
+command = "0xD52A"
+
+[commands.right]
+type = "nec"
+address = "0xBF40"
+command = "0xE619"
+
+[commands.up]
+type = "nec"
+address = "0xBF40"
+command = "0x7D82"
+
 [commands.volume_down]
 type = "nec"
 address = "0xBF40"
@@ -18,3 +78,8 @@ command = "0xE11E"
 type = "nec"
 address = "0xBF40"
 command = "0xE51A"
+
+[commands.youtube]
+type = "nec"
+address = "0xBF40"
+command = "0x5FA0"

@@ -9,12 +9,17 @@ type = "nec"
 address = "0x7F80"
 command = "0xE51A"
 
-[commands.rotate]
+[commands.mute]
 type = "nec"
 address = "0x7F80"
-command = "0xFC03"
+command = "0xE11E"
 
 [commands.speed]
 type = "nec"
 address = "0x7F80"
 command = "0xFE01"
+
+[commands.toggle_rotate]
+type = "nec"
+address = "0x7F80"
+command = "0xFC03"

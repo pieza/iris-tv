@@ -145,6 +145,13 @@ fn bundled_generic_fan_profile_uses_captured_nec_commands() {
 
     assert_eq!(profile.device_type, "fan");
     assert_eq!(
+        profile.signal_for("mute").expect("mute signal"),
+        IrSignal::Nec {
+            address: 0x7F80,
+            command: 0xE11E,
+        }
+    );
+    assert_eq!(
         profile.signal_for("power").expect("power signal"),
         IrSignal::Nec {
             address: 0x7F80,
@@ -152,7 +159,9 @@ fn bundled_generic_fan_profile_uses_captured_nec_commands() {
         }
     );
     assert_eq!(
-        profile.signal_for("rotate").expect("rotate signal"),
+        profile
+            .signal_for("toggle_rotate")
+            .expect("toggle rotate signal"),
         IrSignal::Nec {
             address: 0x7F80,
             command: 0xFC03,
@@ -175,7 +184,7 @@ fn bundled_telstar_tts040490kk_profile_uses_captured_nec_power() {
         .load_brand_model("telstar", Some("tts040490kk"))
         .expect("bundled Telstar profile");
 
-    assert_eq!(profile.commands.len(), 3);
+    assert_eq!(profile.commands.len(), 16);
     assert_eq!(
         profile.signal_for("power").expect("power signal"),
         IrSignal::Nec {
@@ -197,6 +206,13 @@ fn bundled_telstar_tts040490kk_profile_uses_captured_nec_power() {
         IrSignal::Nec {
             address: 0xBF40,
             command: 0xE51A,
+        }
+    );
+    assert_eq!(
+        profile.signal_for("netflix").expect("netflix signal"),
+        IrSignal::Nec {
+            address: 0xBF40,
+            command: 0xD52A,
         }
     );
 }
