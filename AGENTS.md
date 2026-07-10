@@ -55,8 +55,8 @@ cargo run -- send power --dry-run
 ## Agent Workflow
 
 - Inspect the repo first, then make scoped changes.
+- Use Conventional Commits for commit messages: `<type>: <concise imperative summary>`, for example `feat: add power command` or `fix: handle missing active profile`.
 - Prefer CodeGraph for structural code questions when it is initialized. If `.codegraph/` is missing or the server reports "not initialized", ask before running `codegraph init -i`.
 - Treat CodeGraph indexes and generated caches as local-only unless the user explicitly asks to commit them.
 - Use `rg`/`rg --files` for literal text and file searches.
 - Before finalizing, report which verification commands ran and whether any were skipped.
-
