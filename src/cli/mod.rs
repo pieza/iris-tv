@@ -1,10 +1,12 @@
 use crate::config::{AppConfig, ConfigStore, default_profile_root, default_state_dir};
 use crate::daemon;
 use crate::errors::IrisError;
-use crate::ir::{DryRunTransmitter, IrTransmitter, RppalTransmitter};
+use crate::ir::{DryRunTransmitter, IrTransmitter, RppalReceiver, RppalTransmitter};
 use crate::profiles::{ProfileId, ProfileStore};
+use crate::scan::{ScanSession, TerminalInput, prompt_session_name, run_interactive_session};
 use crate::server;
 use clap::{Args, Parser, Subcommand};
+use std::path::PathBuf;
 use std::sync::Arc;
 
 #[derive(Debug, Parser)]
@@ -42,6 +44,8 @@ pub enum Commands {
         #[command(subcommand)]
         command: HomeAssistantCommands,
     },
+    /// Learn commands from an active-low demodulated IR receiver.
+    Scan(ScanArgs),
     Serve(DeviceArgs),
     Status,
 }
@@ -60,6 +64,16 @@ pub struct DeviceArgs {
     pub brand: String,
     #[arg(long)]
     pub model: Option<String>,
+}
+
+#[derive(Debug, Args)]
+pub struct ScanArgs {
+    /// Name for the learned profile and output files.
+    #[arg(long)]
+    pub name: Option<String>,
+    /// Directory in which to create the session log and learned profile.
+    #[arg(long)]
+    pub path: Option<PathBuf>,
 }
 
 #[derive(Debug, Subcommand)]
@@ -101,9 +115,37 @@ pub async fn run(cli: Cli) -> Result<(), IrisError> {
         Commands::Config { command } => config_command(&config_store, command),
         Commands::Daemon { command } => daemon_command(&config_store, &profile_store, command),
         Commands::HomeAssistant { command } => home_assistant_command(&config_store, command),
+        Commands::Scan(args) => scan_command(&config_store, args),
         Commands::Serve(args) => serve(&config_store, &profile_store, &args).await,
         Commands::Status => status(&config_store),
     }
+}
+
+fn scan_command(config_store: &ConfigStore, args: ScanArgs) -> Result<(), IrisError> {
+    let requested_name = match args.name {
+        Some(name) => name,
+        None => prompt_session_name()?,
+    };
+    let output_directory = match args.path {
+        Some(path) => path,
+        None => std::env::current_dir()?,
+    };
+    let config = config_store.load()?;
+    let mut receiver = RppalReceiver::new(config.receiver_gpio_pin, config.carrier_frequency)?;
+    let mut session =
+        ScanSession::new(&requested_name, output_directory, config.carrier_frequency)?;
+    let mut input = TerminalInput::new()?;
+    let mut stdout = std::io::stdout().lock();
+    let profile_path =
+        run_interactive_session(&mut receiver, &mut input, &mut stdout, &mut session)?;
+    drop(stdout);
+    println!(
+        "Wrote {} accepted command(s) to {} and {}",
+        session.accepted_count(),
+        session.log_path().display(),
+        profile_path.display()
+    );
+    Ok(())
 }
 
 fn start_profile(
@@ -263,6 +305,7 @@ fn status(config_store: &ConfigStore) -> Result<(), IrisError> {
         config.active_profile.as_deref().unwrap_or("<none>")
     );
     println!("gpio_pin = {}", config.gpio_pin);
+    println!("receiver_gpio_pin = {}", config.receiver_gpio_pin);
     println!("carrier_frequency = {}", config.carrier_frequency);
     println!("server = {}:{}", config.server_host, config.server_port);
     println!(

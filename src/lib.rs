@@ -5,6 +5,7 @@ pub mod discovery;
 pub mod errors;
 pub mod ir;
 pub mod profiles;
+pub mod scan;
 pub mod server;
 
 pub use errors::IrisError;

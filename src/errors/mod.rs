@@ -70,6 +70,12 @@ pub enum IrisError {
     #[error("invalid configuration key `{key}`")]
     InvalidConfigKey { key: String },
 
+    #[error("scan name must contain at least one letter or number")]
+    InvalidScanName,
+
+    #[error("scan output already exists: `{path}`")]
+    ScanOutputExists { path: PathBuf },
+
     #[error("server exposure requires api_token when server_host is not loopback")]
     MissingApiTokenForNetworkBind,
 

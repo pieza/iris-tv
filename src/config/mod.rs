@@ -7,6 +7,8 @@ use std::path::{Path, PathBuf};
 pub struct AppConfig {
     #[serde(default)]
     pub gpio_pin: u8,
+    #[serde(default = "default_receiver_gpio_pin")]
+    pub receiver_gpio_pin: u8,
     #[serde(default = "default_carrier_frequency")]
     pub carrier_frequency: u32,
     #[serde(default)]
@@ -33,6 +35,7 @@ impl Default for AppConfig {
     fn default() -> Self {
         Self {
             gpio_pin: default_gpio_pin(),
+            receiver_gpio_pin: default_receiver_gpio_pin(),
             carrier_frequency: default_carrier_frequency(),
             active_profile: None,
             default_repeat: default_repeat(),
@@ -49,6 +52,10 @@ impl Default for AppConfig {
 
 fn default_gpio_pin() -> u8 {
     18
+}
+
+fn default_receiver_gpio_pin() -> u8 {
+    23
 }
 
 fn default_carrier_frequency() -> u32 {
@@ -163,6 +170,12 @@ impl ConfigStore {
                 config.gpio_pin = value.parse().map_err(|_| IrisError::InvalidConfigKey {
                     key: key.to_string(),
                 })?;
+            }
+            "receiver_gpio_pin" => {
+                config.receiver_gpio_pin =
+                    value.parse().map_err(|_| IrisError::InvalidConfigKey {
+                        key: key.to_string(),
+                    })?;
             }
             "carrier_frequency" => {
                 config.carrier_frequency =

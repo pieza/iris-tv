@@ -18,7 +18,7 @@ Recommended parts:
 - NPN transistor such as 2N2222 or PN2222.
 - Base resistor around 1 kOhm.
 - IR LED current-limiting resistor sized for your LED and supply voltage.
-- Optional future receiver module, usually 38 kHz, for learning mode.
+- A 38 kHz demodulated IR receiver module for learning mode.
 
 Basic transistor wiring:
 
@@ -30,6 +30,16 @@ IR LED cathode --------------------- NPN collector
 ```
 
 Check your LED current rating and resistor values before powering the circuit.
+
+For `iris scan`, wire a standard active-low demodulated receiver as follows:
+
+```text
+Receiver OUT --- Raspberry Pi BCM GPIO 23 (or receiver_gpio_pin)
+Receiver GND --- Raspberry Pi GND
+Receiver VCC --- a supply appropriate for the module
+```
+
+The receiver output must be 3.3 V-compatible; do not connect a 5 V logic output directly to a Raspberry Pi GPIO. The emitter and receiver must share ground.
 
 ## Install On Raspberry Pi
 
@@ -75,6 +85,7 @@ Default values:
 
 ```toml
 gpio_pin = 18
+receiver_gpio_pin = 23
 carrier_frequency = 38000
 active_profile = "telstar/generic"
 default_repeat = 1
@@ -91,6 +102,7 @@ Set values from the CLI:
 
 ```bash
 iris config set gpio_pin 18
+iris config set receiver_gpio_pin 23
 iris config set carrier_frequency 38000
 iris config set default_repeat 1
 iris config set device_name "Living Room IRIS"
@@ -188,6 +200,20 @@ iris start telstar --model TTC04
 ```
 
 The included Telstar codes are templates. Telstar remotes may vary by model, so replace the values after capturing the real remote codes.
+
+## Learn A Remote
+
+With a 38 kHz active-low receiver connected, start a learning session on the Raspberry Pi:
+
+```bash
+iris scan --name "Living Room TV" --path ./learned-remotes
+```
+
+If `--name` is omitted, IRIS prompts before opening the receiver. If `--path` is omitted, it writes to the current directory and creates missing directories. Names are normalized to snake case, so this example creates `living_room_tv.txt` and `living_room_tv.toml`.
+
+The session shows `press Esc to finish`. Aim the remote at the receiver and press one button at a time. For every capture IRIS shows a recognized NEC/Nikai result when possible, along with the raw mark/space durations. Enter a command name to accept it, or press Esc at the command prompt to skip that frame. Press Esc while waiting for the next button (or Ctrl+C) to finish and write the TOML profile.
+
+Accepted captures are appended immediately to the readable `.txt` session log using the entered label. On finish, the `.toml` file is generated as a usable `brand = "living_room_tv"`, `model = "learned"` profile; recognized codes use NEC or Nikai commands and all other captures use raw timings. IRIS refuses to start if either output file already exists, so it never overwrites a prior learning session.
 
 ## Local Server
 
