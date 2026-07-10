@@ -4,5 +4,17 @@ device_type = "tv"
 carrier_frequency = 38000
 protocol = "nec"
 
-[commands]
-power = { type = "nec", address = "0xBF40", command = "0xED12" }
+[commands.power]
+type = "nec"
+address = "0xBF40"
+command = "0xED12"
+
+[commands.volume_down]
+type = "nec"
+address = "0xBF40"
+command = "0xE11E"
+
+[commands.volume_up]
+type = "nec"
+address = "0xBF40"
+command = "0xE51A"

@@ -4,6 +4,17 @@ device_type = "fan"
 carrier_frequency = 38000
 protocol = "nec"
 
-[commands]
-power = { type = "nec", address = "0xBF40", command = "0xED12" }
-volume_up = { type = "nec", address = "0xBF40", command = "0xE51A" }
+[commands.power]
+type = "nec"
+address = "0x7F80"
+command = "0xE51A"
+
+[commands.rotate]
+type = "nec"
+address = "0x7F80"
+command = "0xFC03"
+
+[commands.speed]
+type = "nec"
+address = "0x7F80"
+command = "0xFE01"
