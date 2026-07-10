@@ -1,4 +1,5 @@
 use assert_cmd::Command;
+use predicates::prelude::PredicateBooleanExt;
 use predicates::str::contains;
 use tempfile::tempdir;
 
@@ -121,7 +122,17 @@ fn debug_help_lists_transmit_diagnostics() {
         .success()
         .stdout(contains("send-nec-raw32"))
         .stdout(contains("carrier"))
-        .stdout(contains("send-and-capture"));
+        .stdout(contains("send-and-capture").not());
+}
+
+#[test]
+fn debug_send_and_capture_is_not_available_with_gpio_ir_tx() {
+    Command::cargo_bin("iris")
+        .expect("binary")
+        .args(["debug", "send-and-capture", "power"])
+        .assert()
+        .failure()
+        .stderr(contains("unrecognized subcommand 'send-and-capture'"));
 }
 
 #[test]

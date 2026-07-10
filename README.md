@@ -169,9 +169,12 @@ iris debug send-nec-raw32 0x1AE5807F
 # Emit only a 38 kHz carrier for two seconds.
 iris debug carrier --duration 2
 
-# Send a profile command and print what receiver_gpio_pin captures.
-iris debug send-and-capture power
 ```
+
+`gpio-ir-tx` disables local interrupts while it transmits precise timings, so
+IRIS cannot reliably capture the same transmission on a receiver connected to
+the same Pi. Verify the receiver separately with `iris scan` and an original
+remote, and verify the emitter using the TV or an external receiver.
 
 ## Basic Use
 

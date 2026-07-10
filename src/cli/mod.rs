@@ -2,8 +2,8 @@ use crate::config::{AppConfig, ConfigStore, default_profile_root, default_state_
 use crate::daemon;
 use crate::errors::IrisError;
 use crate::ir::{
-    CapturedFrame, DryRunTransmitter, IrReceiver, IrSignal, IrTransmitter, RppalReceiver,
-    RppalTransmitter, build_nec_raw32_pulses,
+    DryRunTransmitter, IrSignal, IrTransmitter, RppalReceiver, RppalTransmitter,
+    build_nec_raw32_pulses,
 };
 use crate::profiles::{ProfileId, ProfileStore};
 use crate::scan::{ScanSession, TerminalInput, prompt_session_name, run_interactive_session};
@@ -169,8 +169,6 @@ pub enum DebugCommands {
         #[arg(long, value_parser = clap::value_parser!(u64).range(1..))]
         duration: u64,
     },
-    /// Send a command and show the raw frame captured on receiver_gpio_pin.
-    SendAndCapture { command: String },
 }
 
 pub async fn run(cli: Cli) -> Result<(), IrisError> {
@@ -186,7 +184,7 @@ pub async fn run(cli: Cli) -> Result<(), IrisError> {
         Commands::Config { command } => config_command(&config_store, command),
         Commands::Daemon { command } => daemon_command(&config_store, &profile_store, command),
         Commands::HomeAssistant { command } => home_assistant_command(&config_store, command),
-        Commands::Debug { command } => debug_command(&config_store, &profile_store, command),
+        Commands::Debug { command } => debug_command(&config_store, command),
         Commands::Scan(args) => scan_command(&config_store, args),
         Commands::Update(args) => update_command(args),
         Commands::Serve(args) => serve(&config_store, &profile_store, args).await,
@@ -223,11 +221,7 @@ fn update_command(args: UpdateArgs) -> Result<(), IrisError> {
     Ok(())
 }
 
-fn debug_command(
-    config_store: &ConfigStore,
-    profile_store: &ProfileStore,
-    command: DebugCommands,
-) -> Result<(), IrisError> {
+fn debug_command(config_store: &ConfigStore, command: DebugCommands) -> Result<(), IrisError> {
     const NEC_CARRIER_FREQUENCY: u32 = 38_000;
 
     let config = config_store.load()?;
@@ -248,27 +242,6 @@ fn debug_command(
             let tx = RppalTransmitter::new(config.gpio_pin, NEC_CARRIER_FREQUENCY)?;
             tx.send_carrier(Duration::from_secs(duration))
         }
-        DebugCommands::SendAndCapture { command } => {
-            let device = config.device(None)?;
-            let profile = profile_store.load(&device.profile)?;
-            let frequency = effective_frequency(&config, &profile);
-            let signal = profile.signal_for(&command)?;
-            let tx = RppalTransmitter::new(config.gpio_pin, frequency)?;
-            let mut receiver = RppalReceiver::new(config.receiver_gpio_pin, frequency)?;
-            // Ensure the interrupt receiver is already waiting before the first
-            // MARK. Otherwise a short NEC frame can lose its leading 9 ms pulse.
-            let sender = std::thread::spawn(move || {
-                std::thread::sleep(Duration::from_millis(50));
-                tx.send_with_frequency(signal, 1, frequency)
-            });
-            let captured = receiver.receive_frame(Duration::from_secs(2));
-            sender.join().map_err(|_| {
-                IrisError::IoPlain(std::io::Error::other("IR send thread panicked"))
-            })??;
-            let frame = captured?.ok_or(IrisError::CaptureTimedOut)?;
-            print_captured_frame(&frame);
-            Ok(())
-        }
     }
 }
 
@@ -280,18 +253,6 @@ fn parse_hex_u32(value: &str) -> Result<u32, IrisError> {
     u32::from_str_radix(hex, 16).map_err(|_| IrisError::InvalidHex {
         value: value.to_string(),
     })
-}
-
-fn print_captured_frame(frame: &CapturedFrame) {
-    let description = match &frame.signal {
-        IrSignal::Nec { address, command } => {
-            format!("NEC address=0x{address:04X} command=0x{command:04X}")
-        }
-        IrSignal::Nikai { data, bits } => format!("NIKAI data=0x{data:06X} bits={bits}"),
-        IrSignal::Raw { frequency, .. } => format!("RAW frequency={frequency}"),
-    };
-    println!("Captured: {description}");
-    println!("Raw pulses: {:?}", frame.pulses);
 }
 
 fn scan_command(config_store: &ConfigStore, args: ScanArgs) -> Result<(), IrisError> {

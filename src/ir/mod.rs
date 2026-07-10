@@ -354,10 +354,10 @@ impl RppalTransmitter {
     pub fn send_carrier(&self, duration: Duration) -> Result<(), IrisError> {
         #[cfg(all(feature = "rpi-gpio", target_os = "linux"))]
         {
-            self.send_lirc_pulses(
-                &[duration.as_micros().min(u128::from(u32::MAX)) as u32],
-                self.carrier_frequency,
-            )
+            for chunk in lirc_duration_chunks(duration) {
+                self.send_lirc_pulses(&[chunk], self.carrier_frequency)?;
+            }
+            Ok(())
         }
         #[cfg(not(all(feature = "rpi-gpio", target_os = "linux")))]
         {
@@ -368,13 +368,15 @@ impl RppalTransmitter {
 
     #[cfg(all(feature = "rpi-gpio", target_os = "linux"))]
     fn send_lirc_pulses(&self, pulses: &[u32], carrier_frequency: u32) -> Result<(), IrisError> {
+        let transmitted = lirc_pulses_to_write(pulses);
+        validate_lirc_pulses(transmitted)?;
         let path = lirc_device_path();
         let file = File::options()
             .write(true)
             .open(&path)
             .map_err(|_| IrisError::IrTransmitterUnavailable { path: path.clone() })?;
         configure_lirc(&file, &path, carrier_frequency)?;
-        write_lirc_pulses(&file, pulses).map_err(IrisError::IoPlain)
+        write_lirc_pulses(&file, transmitted).map_err(IrisError::IoPlain)
     }
 }
 
@@ -450,15 +452,43 @@ fn configure_lirc(file: &File, path: &PathBuf, carrier_frequency: u32) -> Result
     ioctl_u32(file, LIRC_SET_SEND_DUTY_CYCLE, &mut duty_cycle).map_err(IrisError::IoPlain)
 }
 
-#[cfg(all(feature = "rpi-gpio", target_os = "linux"))]
-fn write_lirc_pulses(file: &File, pulses: &[u32]) -> std::io::Result<()> {
+#[cfg(any(test, all(feature = "rpi-gpio", target_os = "linux")))]
+fn lirc_pulses_to_write(pulses: &[u32]) -> &[u32] {
     let end = if pulses.len().is_multiple_of(2) {
         pulses.len().saturating_sub(1)
     } else {
         pulses.len()
     };
-    let mut bytes = Vec::with_capacity(end * std::mem::size_of::<u32>());
-    for pulse in &pulses[..end] {
+    &pulses[..end]
+}
+
+#[cfg(any(test, all(feature = "rpi-gpio", target_os = "linux")))]
+fn validate_lirc_pulses(pulses: &[u32]) -> Result<(), IrisError> {
+    if let Some(&duration_us) = pulses
+        .iter()
+        .find(|&&duration_us| duration_us > LIRC_MAX_PULSE_DURATION_US)
+    {
+        return Err(IrisError::IrPulseDurationTooLong { duration_us });
+    }
+    Ok(())
+}
+
+#[cfg(any(test, all(feature = "rpi-gpio", target_os = "linux")))]
+fn lirc_duration_chunks(duration: Duration) -> Vec<u32> {
+    let mut remaining = duration.as_micros();
+    let mut chunks = Vec::new();
+    while remaining > 0 {
+        let chunk = remaining.min(u128::from(LIRC_MAX_PULSE_DURATION_US)) as u32;
+        chunks.push(chunk);
+        remaining -= u128::from(chunk);
+    }
+    chunks
+}
+
+#[cfg(all(feature = "rpi-gpio", target_os = "linux"))]
+fn write_lirc_pulses(file: &File, pulses: &[u32]) -> std::io::Result<()> {
+    let mut bytes = Vec::with_capacity(pulses.len() * std::mem::size_of::<u32>());
+    for pulse in pulses {
         bytes.extend_from_slice(&pulse.to_ne_bytes());
     }
     let mut file = file;
@@ -489,6 +519,9 @@ const LIRC_SET_SEND_MODE: libc::c_ulong = 0x4004_6911;
 const LIRC_SET_SEND_CARRIER: libc::c_ulong = 0x4004_6913;
 #[cfg(all(feature = "rpi-gpio", target_os = "linux"))]
 const LIRC_SET_SEND_DUTY_CYCLE: libc::c_ulong = 0x4004_6915;
+
+#[cfg(any(test, all(feature = "rpi-gpio", target_os = "linux")))]
+const LIRC_MAX_PULSE_DURATION_US: u32 = 500_000;
 
 #[cfg(all(feature = "rpi-gpio", target_os = "linux"))]
 const FRAME_IDLE_GAP: Duration = Duration::from_millis(20);
@@ -603,5 +636,33 @@ impl IrReceiver for RppalReceiver {
             let _ = timeout;
             Err(IrisError::GpioUnavailable)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn carrier_duration_is_split_into_driver_safe_chunks() {
+        assert_eq!(
+            lirc_duration_chunks(Duration::from_secs(2)),
+            vec![500_000, 500_000, 500_000, 500_000]
+        );
+    }
+
+    #[test]
+    fn validates_only_pulses_written_to_lirc() {
+        let pulses = [560, 850_000];
+        assert_eq!(lirc_pulses_to_write(&pulses), &[560]);
+        assert!(validate_lirc_pulses(lirc_pulses_to_write(&pulses)).is_ok());
+
+        let error = validate_lirc_pulses(&[500_001]).expect_err("long pulse is rejected");
+        assert!(matches!(
+            error,
+            IrisError::IrPulseDurationTooLong {
+                duration_us: 500_001
+            }
+        ));
     }
 }

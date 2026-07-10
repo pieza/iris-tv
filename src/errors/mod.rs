@@ -60,6 +60,9 @@ pub enum IrisError {
     #[error("Linux IR transmitter at `{path}` does not support pulse transmission")]
     IrTransmitterUnsupported { path: PathBuf },
 
+    #[error("IR pulse duration {duration_us} µs exceeds the gpio-ir-tx limit of 500000 µs")]
+    IrPulseDurationTooLong { duration_us: u32 },
+
     #[error("timed out waiting for an IR frame from the receiver")]
     CaptureTimedOut,
 
