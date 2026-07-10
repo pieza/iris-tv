@@ -73,6 +73,35 @@ curl -fsSL https://raw.githubusercontent.com/pieza/iris-tv/main/scripts/install.
 
 The installer downloads the release asset, installs `iris` to `/usr/local/bin/iris`, and installs editable profiles to `/usr/local/share/iris/profiles`.
 
+## Updates
+
+On a Raspberry Pi ARM64 installation made by the release installer, check for a
+new stable release with:
+
+```bash
+iris update --check
+```
+
+Install the latest stable release with:
+
+```bash
+iris update
+```
+
+`iris update` requires `curl`, `tar`, and (unless it is run as root) `sudo`.
+It downloads the published ARM64 release package, validates it before asking
+for privileges, and replaces the executable atomically. Existing editable
+profiles in `/usr/local/share/iris/profiles` are preserved. To intentionally
+replace them with the release versions, use:
+
+```bash
+iris update --replace-profiles
+```
+
+The updater is only able to install from `/usr/local/bin/iris` on arm64/aarch64.
+It can still use `--check` from a development checkout or another architecture.
+If the IRIS daemon is running, a successful update restarts it automatically.
+
 ## Local Build
 
 Install Rust on the Pi, clone or copy this project, then build with the GPIO backend:

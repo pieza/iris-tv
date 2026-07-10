@@ -69,6 +69,24 @@ pub enum IrisError {
     #[error("daemon is not running")]
     DaemonNotRunning,
 
+    #[error("IRIS updates are only supported on arm64/aarch64; detected `{architecture}`")]
+    UpdateUnsupportedArchitecture { architecture: String },
+
+    #[error("IRIS updates require the installed binary at `/usr/local/bin/iris`; running `{path}`")]
+    UpdateUnsupportedInstallation { path: PathBuf },
+
+    #[error("GitHub returned an invalid IRIS release: {reason}")]
+    InvalidRelease { reason: String },
+
+    #[error("the latest IRIS release does not yet contain the ARM64 package")]
+    UpdateAssetMissing,
+
+    #[error("update command `{command}` failed: {reason}")]
+    UpdateCommandFailed { command: String, reason: String },
+
+    #[error("downloaded update package is invalid: {reason}")]
+    InvalidUpdatePackage { reason: String },
+
     #[error("failed to bind server to {addr}: {source}")]
     ServerBindFailure {
         addr: String,

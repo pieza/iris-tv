@@ -7,5 +7,6 @@ pub mod ir;
 pub mod profiles;
 pub mod scan;
 pub mod server;
+pub mod update;
 
 pub use errors::IrisError;

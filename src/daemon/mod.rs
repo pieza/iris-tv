@@ -38,6 +38,12 @@ pub fn stop(state_dir: &Path) -> Result<(), IrisError> {
     remove_pid(&pid_path)
 }
 
+/// Returns whether the daemon PID file refers to a currently running process.
+/// A stale or malformed PID file is treated as not running.
+pub fn is_running(state_dir: &Path) -> Result<bool, IrisError> {
+    Ok(read_pid(&pid_path(state_dir))?.is_some_and(process_alive))
+}
+
 fn pid_path(state_dir: &Path) -> PathBuf {
     state_dir.join("iris.pid")
 }

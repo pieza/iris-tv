@@ -8,6 +8,7 @@ use crate::ir::{
 use crate::profiles::{ProfileId, ProfileStore};
 use crate::scan::{ScanSession, TerminalInput, prompt_session_name, run_interactive_session};
 use crate::server::{self, RegisteredDevice};
+use crate::update::{self, UpdateOptions};
 use clap::{Args, Parser, Subcommand};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -58,6 +59,8 @@ pub enum Commands {
     },
     /// Learn commands from an active-low demodulated IR receiver.
     Scan(ScanArgs),
+    /// Check for and install the latest stable ARM64 release.
+    Update(UpdateArgs),
     Serve(OptionalDeviceArgs),
     Status,
 }
@@ -98,6 +101,16 @@ pub struct ScanArgs {
     /// Type of learned device profile.
     #[arg(long, default_value = "tv", value_parser = ["tv", "fan"])]
     pub device_type: String,
+}
+
+#[derive(Debug, Args)]
+pub struct UpdateArgs {
+    /// Only check whether a newer release is available.
+    #[arg(long)]
+    pub check: bool,
+    /// Replace installed profiles with the profiles from the release.
+    #[arg(long)]
+    pub replace_profiles: bool,
 }
 
 #[derive(Debug, Subcommand)]
@@ -175,9 +188,39 @@ pub async fn run(cli: Cli) -> Result<(), IrisError> {
         Commands::HomeAssistant { command } => home_assistant_command(&config_store, command),
         Commands::Debug { command } => debug_command(&config_store, &profile_store, command),
         Commands::Scan(args) => scan_command(&config_store, args),
+        Commands::Update(args) => update_command(args),
         Commands::Serve(args) => serve(&config_store, &profile_store, args).await,
         Commands::Status => status(&config_store),
     }
+}
+
+fn update_command(args: UpdateArgs) -> Result<(), IrisError> {
+    let result = update::run(UpdateOptions {
+        check_only: args.check,
+        replace_profiles: args.replace_profiles,
+        state_dir: default_state_dir()?,
+    })?;
+
+    match result {
+        update::UpdateResult::UpToDate { installed, latest } => {
+            println!("IRIS is up to date ({installed}; latest stable release: {latest})");
+        }
+        update::UpdateResult::Available { installed, latest } => {
+            println!("Update available: {installed} -> {latest}");
+        }
+        update::UpdateResult::Installed {
+            installed,
+            profiles,
+            daemon_restarted,
+        } => {
+            println!("Updated IRIS to {installed}");
+            println!("Profiles {profiles}");
+            if daemon_restarted {
+                println!("Restarted IRIS daemon");
+            }
+        }
+    }
+    Ok(())
 }
 
 fn debug_command(

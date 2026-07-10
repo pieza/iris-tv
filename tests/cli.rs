@@ -125,6 +125,17 @@ fn debug_help_lists_transmit_diagnostics() {
 }
 
 #[test]
+fn update_help_lists_safe_update_options() {
+    Command::cargo_bin("iris")
+        .expect("binary")
+        .args(["update", "--help"])
+        .assert()
+        .success()
+        .stdout(contains("--check"))
+        .stdout(contains("--replace-profiles"));
+}
+
+#[test]
 fn device_commands_register_and_select_named_profiles() {
     let config_dir = tempdir().expect("config dir");
     let profile_dir = tempdir().expect("profile dir");

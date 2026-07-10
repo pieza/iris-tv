@@ -1,6 +1,6 @@
 [package]
 name = "iris"
-version = "1.6.5"
+version = "1.6.6"
 edition = "2024"
 description = "Rust CLI for controlling infrared TVs from a Raspberry Pi"
 license = "MIT"
