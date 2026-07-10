@@ -92,7 +92,7 @@ fn default_server_port() -> u16 {
 }
 
 fn default_device_name() -> String {
-    "IRIS TV".to_string()
+    "IRIS".to_string()
 }
 
 fn default_discovery_enabled() -> bool {
@@ -169,7 +169,7 @@ impl ConfigStore {
         if config.api_token.as_deref().unwrap_or("").is_empty() {
             config.api_token = Some(generate_api_token());
         }
-        if config.device_name.trim().is_empty() {
+        if config.device_name.trim().is_empty() || config.device_name == "IRIS TV" {
             config.device_name = default_device_name();
         }
         config.server_host = "0.0.0.0".to_string();

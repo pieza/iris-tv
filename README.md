@@ -138,7 +138,7 @@ server_host = "127.0.0.1"
 server_port = 8787
 api_token = ""
 device_id = ""
-device_name = "IRIS TV"
+device_name = "IRIS"
 discovery_enabled = true
 ```
 
@@ -402,7 +402,7 @@ iris home-assistant setup
 iris daemon start telstar
 ```
 
-`iris home-assistant setup` generates and persists a bridge ID, generates an `api_token` if one is missing, enables discovery, and configures the server to listen on `0.0.0.0:8787`. The Home Assistant integration configures that bridge once and creates a separate Home Assistant device for every registered IRIS TV or fan. Protected endpoints still require the token.
+`iris home-assistant setup` generates and persists a bridge ID, generates an `api_token` if one is missing, enables discovery, and configures the server to listen on `0.0.0.0:8787`. It also migrates the old default bridge name `IRIS TV` to `IRIS` while preserving custom names. The Home Assistant integration configures that bridge once and creates a separate Home Assistant device for every registered TV or fan. Protected endpoints still require the token.
 
 Install `iris-home-assistant` through HACS as a custom repository of type `Integration`. After Home Assistant restarts, accept the discovered IRIS device and enter the API token printed by `iris home-assistant setup`.
 

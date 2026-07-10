@@ -296,7 +296,39 @@ fn home_assistant_setup_prepares_network_config_and_token() {
             .as_deref()
             .is_some_and(|token| token.len() >= 32)
     );
+    assert_eq!(prepared.device_name, "IRIS");
     assert_eq!(loaded, prepared);
+}
+
+#[test]
+fn home_assistant_setup_migrates_only_the_legacy_bridge_name() {
+    let root = tempdir().expect("temp root");
+    let store = ConfigStore::new(root.path());
+
+    store
+        .save(&AppConfig {
+            device_name: "IRIS TV".to_string(),
+            ..AppConfig::default()
+        })
+        .expect("save legacy config");
+    assert_eq!(
+        store.prepare_home_assistant().expect("migrate").device_name,
+        "IRIS"
+    );
+
+    store
+        .save(&AppConfig {
+            device_name: "Living Room IRIS".to_string(),
+            ..AppConfig::default()
+        })
+        .expect("save custom config");
+    assert_eq!(
+        store
+            .prepare_home_assistant()
+            .expect("preserve")
+            .device_name,
+        "Living Room IRIS"
+    );
 }
 
 #[test]

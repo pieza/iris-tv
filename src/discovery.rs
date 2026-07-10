@@ -51,7 +51,7 @@ pub fn build_service_info(config: &AppConfig) -> Result<ServiceInfo, IrisError> 
         .filter(|id| !id.is_empty())
         .unwrap_or("iris-tv");
     let instance_name = if config.device_name.trim().is_empty() {
-        "IRIS Hub".to_string()
+        "IRIS".to_string()
     } else {
         config.device_name.clone()
     };
