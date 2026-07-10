@@ -131,30 +131,6 @@ iris send volume_down
 iris send mute
 ```
 
-Try candidate power codes interactively:
-
-```bash
-iris scan power
-```
-
-IRIS sends one candidate at a time and waits for Enter before the next one. If a code works, note the candidate name printed in the terminal. Use `--repeat` to send each candidate multiple times:
-
-```bash
-iris scan power --repeat 5
-```
-
-Run a broad scan that sends different candidate commands once per second:
-
-```bash
-iris scan bomb
-```
-
-Stop it with `Ctrl+C` when the TV reacts, then note the last candidate printed. Use `--limit`, `--repeat`, and `--interval-ms` to tune the scan:
-
-```bash
-iris scan bomb --repeat 3 --interval-ms 1000
-```
-
 Repeat a command:
 
 ```bash

@@ -86,38 +86,3 @@ fn home_assistant_setup_command_persists_network_discovery_config() {
     assert!(config.contains("device_id = "));
     assert!(config.contains("api_token = "));
 }
-
-#[test]
-fn scan_power_lists_candidate_codes_in_dry_run_mode() {
-    Command::cargo_bin("iris")
-        .expect("binary")
-        .args(["scan", "power", "--dry-run", "--yes", "--repeat", "3"])
-        .assert()
-        .success()
-        .stdout(contains("Scanning power candidates (30)"))
-        .stdout(contains("tcl_nikai_power"))
-        .stdout(contains("NIKAI data=0x0D5F2A bits=24 repeat=3"))
-        .stdout(contains("nec_00ff_a25d"))
-        .stdout(contains("NEC address=0x00FF command=0xA25D repeat=3"));
-}
-
-#[test]
-fn scan_bomb_runs_multiple_command_candidates_without_prompting() {
-    Command::cargo_bin("iris")
-        .expect("binary")
-        .args([
-            "scan",
-            "bomb",
-            "--dry-run",
-            "--limit",
-            "3",
-            "--interval-ms",
-            "0",
-        ])
-        .assert()
-        .success()
-        .stdout(contains("Bombing IR candidates"))
-        .stdout(contains("tcl_nikai_power"))
-        .stdout(contains("tcl_nikai_volume_up"))
-        .stdout(contains("tcl_nikai_volume_down"));
-}
