@@ -515,7 +515,7 @@ dependencies = [
 
 [[package]]
 name = "iris"
-version = "1.6.4"
+version = "1.6.5"
 dependencies = [
  "assert_cmd",
  "axum",

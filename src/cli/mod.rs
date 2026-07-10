@@ -212,7 +212,12 @@ fn debug_command(
             let signal = profile.signal_for(&command)?;
             let tx = RppalTransmitter::new(config.gpio_pin, frequency)?;
             let mut receiver = RppalReceiver::new(config.receiver_gpio_pin, frequency)?;
-            let sender = std::thread::spawn(move || tx.send_with_frequency(signal, 1, frequency));
+            // Ensure the interrupt receiver is already waiting before the first
+            // MARK. Otherwise a short NEC frame can lose its leading 9 ms pulse.
+            let sender = std::thread::spawn(move || {
+                std::thread::sleep(Duration::from_millis(50));
+                tx.send_with_frequency(signal, 1, frequency)
+            });
             let captured = receiver.receive_frame(Duration::from_secs(2));
             sender.join().map_err(|_| {
                 IrisError::IoPlain(std::io::Error::other("IR send thread panicked"))
